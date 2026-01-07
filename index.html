@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>夏果羽球排點助手 (到場時間版)</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #27ae60;
+            --bg: #f4f6f7;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text: #333;
+            --prep-bg: #fffcf5;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        #bgLayer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+            background-position: center; background-repeat: no-repeat; background-size: contain;
+            opacity: 0.15; pointer-events: none;
+        }
+
+        h1, h2, h3, h4 { margin: 0.5em 0; }
+        
+        .container { max-width: 1400px; width: 100%; display: flex; flex-direction: column; gap: 20px; }
+
+        /* Controls */
+        .controls {
+            background: var(--card-bg); padding: 15px; border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; flex-wrap: wrap;
+            gap: 15px; align-items: center; justify-content: space-between; backdrop-filter: blur(5px);
+        }
+
+        .input-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+        input[type="text"], input[type="number"], select {
+            padding: 6px; border: 1px solid #ccc; border-radius: 5px; font-size: 15px;
+        }
+
+        button {
+            padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer;
+            font-size: 15px; font-weight: bold; transition: opacity 0.2s;
+            display: flex; align-items: center; gap: 4px; white-space: nowrap;
+        }
+        button:hover { opacity: 0.9; }
+
+        .btn-add { background-color: var(--accent); color: white; }
+        .btn-auto { background-color: #3498db; color: white; }
+        .btn-reset { background-color: #95a5a6; color: white; }
+        .btn-export { background-color: #8e44ad; color: white; }
+        .btn-import { background-color: #d35400; color: white; }
+        .btn-clear-all { background-color: #c0392b; color: white; }
+        .btn-bg { background-color: #f1c40f; color: #333; } 
+        .btn-partner { background-color: #e84393; color: white; }
+        .btn-blacklist { background-color: #34495e; color: white; }
+        .btn-mini { font-size: 12px; padding: 2px 6px; }
+        .btn-rest { background-color: #7f8c8d; color: white; }
+        .btn-active { background-color: #27ae60; color: white; }
+
+        /* Layout */
+        .main-area { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+
+        .column-box {
+            background: var(--card-bg); padding: 15px; border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-height: 85vh;
+            display: flex; flex-direction: column; backdrop-filter: blur(5px);
+        }
+
+        .scrollable-content { overflow-y: auto; flex: 1; padding-right: 5px; }
+
+        .col-players { flex: 1; min-width: 280px; }
+        .col-history { flex: 1; min-width: 320px; }
+        .col-courts {
+            flex: 2; min-width: 350px; background: transparent; box-shadow: none; padding: 0;
+            display: flex; flex-direction: column; gap: 20px;
+        }
+
+        /* Player List */
+        .section-header {
+            font-size: 14px; font-weight: bold; color: #666; 
+            margin: 10px 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 3px;
+        }
+        .player-list { display: flex; flex-direction: column; gap: 6px; }
+
+        .player-card {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px; border-radius: 6px; background: #f8f9fa;
+            border: 1px solid #eee; cursor: pointer; user-select: none; transition: transform 0.1s;
+        }
+        .player-card:active { transform: scale(0.98); }
+        .player-card.selected { border: 2px solid var(--primary); background: #e8f4fd; }
+        .player-card.resting { opacity: 0.6; background: #eee; }
+
+        .tag {
+            padding: 2px 6px; border-radius: 4px; color: white; font-size: 11px;
+            font-weight: bold; margin-right: 5px; min-width: 20px; text-align: center;
+        }
+        .lvl-low { background-color: #27ae60; } 
+        .lvl-mid { background-color: #2980b9; } 
+        .lvl-high { background-color: #e74c3c; } 
+
+        .count-badge {
+            background: #34495e; color: white; border-radius: 50%; width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center; font-size: 11px; margin-right: 5px;
+        }
+        
+        .time-badge {
+            font-size: 11px; color: #888; margin-right: 8px; font-family: monospace;
+        }
+
+        .name-edit { border-bottom: 1px dashed #999; cursor: text; }
+
+        /* Prep Area */
+        .prep-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+        .prep-row {
+            background: var(--prep-bg); border: 2px dashed #f39c12; border-radius: 8px;
+            padding: 8px 15px; display: flex; flex-direction: column; gap: 8px;
+            transition: all 0.2s;
+        }
+        .prep-row.moving-mode {
+            border-color: #e74c3c; background: #fff0f0; box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+        }
+        .prep-header { display: flex; justify-content: space-between; align-items: center; }
+        .prep-label { font-weight: bold; color: #d35400; font-size: 14px; }
+        .prep-actions { display: flex; gap: 5px; }
+
+        /* Grid */
+        .courts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+
+        /* Court */
+        .court {
+            background: #2ecc71; border: 4px solid white; border-radius: 4px; padding: 15px;
+            display: flex; flex-direction: column; gap: 10px; position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: box-shadow 0.3s;
+        }
+        .court.swapping { box-shadow: 0 0 15px 5px yellow; border-color: yellow; animation: pulse 1s infinite; }
+        .court.target-mode { box-shadow: 0 0 15px 5px #e74c3c; border-color: #e74c3c; cursor: pointer; transform: scale(1.02); }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+        .court-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .court-title { color: white; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); font-size: 18px; margin-right: 10px;}
+        .court-controls { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: space-between;}
+        .rule-select { padding: 2px; font-size: 12px; border-radius: 4px; border: none; width: 100px; }
+        
+        .court-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+
+        .btn-court-action {
+            border: 1px solid white; color: white; font-size: 11px; padding: 3px 8px;
+            border-radius: 12px; cursor: pointer; white-space: nowrap;
+        }
+        .btn-clear { background: rgba(0,0,0,0.3); } .btn-clear:hover { background: #c0392b; }
+        .btn-speak { background: #2980b9; } .btn-speak:hover { background: #3498db; }
+        .btn-auto-court { background: #d35400; } .btn-auto-court:hover { background: #e67e22; }
+        .btn-swap { background: #8e44ad; } .btn-swap:hover { background: #9b59b6; }
+        .btn-move-in { background: #16a085; border:1px solid #16a085; } .btn-move-in:hover { background: #1abc9c; }
+
+        .net { height: 4px; background: white; width: 100%; margin: 5px 0; opacity: 0.8; }
+        .team { display: flex; gap: 10px; justify-content: space-around; }
+
+        .slot {
+            background: rgba(255,255,255,0.9); border-radius: 6px; height: 55px; flex: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; border: 2px dashed #ccc; position: relative;
+        }
+        .slot:hover { border-color: #666; }
+        .slot-content { text-align: center; width: 100%; }
+        .slot-name { font-weight: bold; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+        .slot-level { font-size: 11px; margin-top: 2px; }
+
+        .remove-slot-btn {
+            position: absolute; top: -5px; right: -5px; background: red; color: white;
+            border-radius: 50%; width: 16px; height: 16px; font-size: 10px; line-height: 16px;
+            text-align: center; display: none; z-index: 10;
+        }
+        .slot.filled:hover .remove-slot-btn { display: block; }
+        .slot.filled { border: 2px solid var(--primary); border-style: solid; }
+
+        /* History */
+        .history-list { list-style: none; padding: 0; margin: 0; }
+        .history-item { border-bottom: 1px solid #eee; padding: 8px 5px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #333; }
+        .history-item:nth-child(even) { background-color: #fafafa; }
+        .history-info { display: flex; align-items: center; gap: 5px; flex: 1; }
+        .match-badge { background: #7f8c8d; color: white; border-radius: 3px; padding: 1px 5px; font-size: 11px; }
+        .delete-hist-btn { color: #ccc; cursor: pointer; font-size: 16px; padding: 0 5px; }
+        .delete-hist-btn:hover { color: red; }
+
+        /* Tables & Modal */
+        .stats-table, .partner-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        .stats-table th, .stats-table td, .partner-table th, .partner-table td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+        .stats-table th { background-color: #f2f2f2; }
+        
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background-color: white; padding: 20px; border-radius: 10px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .close-modal { float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+
+        @media (max-width: 768px) {
+            .input-group { width: 100%; } .input-group input { flex: 1; }
+            .col-players, .col-history, .col-courts { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="bgLayer"></div>
+
+<div class="container">
+    <div class="controls">
+        <div class="input-group">
+            <h3 style="color:var(--primary); margin:0;">夏果排點助手</h3>
+        </div>
+        
+        <div class="input-group">
+            <input type="text" id="pName" placeholder="姓名" style="width:100px;">
+            <select id="pLevel" style="width:70px;">
+                </select>
+            <button class="btn-add" onclick="addPlayer()">+ 加人</button>
+        </div>
+
+        <div class="input-group">
+            <label>場地：</label>
+            <input type="number" id="courtCount" value="4" min="1" max="8" style="width: 40px;" onchange="renderCourts()">
+        </div>
+
+        <div class="input-group">
+            <label>🗣️ 語音：</label>
+            <select id="voiceSelect" onchange="saveSettings()">
+                <option value="female">👩 女聲 (預設)</option>
+                <option value="male">👨 男聲 (嘗試)</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <button class="btn-auto" onclick="autoAssignAll()">🎲 全場補滿</button>
+            <button class="btn-partner" onclick="showPartnerModal()">❤️ 搭檔</button>
+            <button class="btn-blacklist" onclick="showBlacklistModal()">🚫 迴避</button>
+            <button class="btn-export" onclick="showStats()">📊 統計</button>
+            
+            <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="handleFileUpload(event)">
+            <input type="file" id="bgInput" accept="image/*" style="display:none" onchange="handleBgUpload(event)">
+            
+            <button class="btn-import" onclick="document.getElementById('csvInput').click()">📂 匯入</button>
+            <button class="btn-bg" onclick="document.getElementById('bgInput').click()">🖼️ 背景</button>
+            <button class="btn-clear-all" onclick="clearAllData()">⚠️ 重置</button>
+        </div>
+    </div>
+
+    <div class="main-area">
+        <div class="column-box col-players">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>人員名單 (<span id="waitCount">0</span>)</h3>
+            </div>
+            <div class="scrollable-content">
+                <div class="section-header">候位區 (可上場)</div>
+                <div id="playerList" class="player-list"></div>
+                
+                <div class="section-header" style="margin-top:20px;">休息區 (暫停排點)</div>
+                <div id="restList" class="player-list"></div>
+            </div>
+        </div>
+
+        <div class="column-box col-history">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:5px;">
+                <h3>對戰紀錄</h3>
+                <button class="btn-mini-clear" onclick="clearHistory()">🗑️ 清空</button>
+            </div>
+            <div class="scrollable-content">
+                 <ul id="historyListMain" class="history-list"></ul>
+            </div>
+        </div>
+
+        <div class="col-courts">
+            <div class="prep-container" id="prepContainer"></div>
+
+            <div id="courtsGrid" class="courts-grid"></div>
+        </div>
+    </div>
+</div>
+
+<div id="statsModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeModal('statsModal')">&times;</span>
+        <h2>統計表</h2>
+        <button class="btn-export" onclick="exportCSV()">下載 CSV</button>
+        <table class="stats-table">
+            <thead><tr><th>姓名</th><th>程度</th><th>場次</th><th>到場時間</th></tr></thead>
+            <tbody id="statsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="partnerModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeModal('partnerModal')">&times;</span>
+        <h2>固定搭檔</h2>
+        <div style="margin-bottom:10px; background:#f9f9f9; padding:10px;">
+            <select id="partnerP1" style="width:40%"></select> + <select id="partnerP2" style="width:40%"></select>
+            <button class="btn-add" onclick="addPartner()" style="margin-top:5px;">綁定</button>
+        </div>
+        <table class="partner-table"><tbody id="partnerListBody"></tbody></table>
+    </div>
+</div>
+
+<div id="blacklistModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeModal('blacklistModal')">&times;</span>
+        <h2>迴避設定 (不能同場)</h2>
+        <div style="margin-bottom:10px; background:#f9f9f9; padding:10px;">
+            <select id="blP1" style="width:40%"></select> X <select id="blP2" style="width:40%"></select>
+            <button class="btn-blacklist" onclick="addBlacklist()" style="margin-top:5px;">設定</button>
+        </div>
+        <table class="partner-table"><tbody id="blacklistBody"></tbody></table>
+    </div>
+</div>
+
+<script>
+    // --- Data Model ---
+    let players = [];
+    let courts = []; 
+    let prepCourts = [[null,null,null,null], [null,null,null,null], [null,null,null,null]];
+    let matchHistory = []; 
+    let courtRules = []; 
+    
+    let selectedPlayerId = null;
+    let swapSourceIndex = null; 
+    let movingPrepIndex = null; 
+    let availableVoices = [];
+
+    // --- Time Helper ---
+    function getCurrentTimeStr() {
+        const now = new Date();
+        return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    // --- Init ---
+    window.onload = function() {
+        initLevelSelect();
+        loadData();
+        if(courts.length === 0) renderCourts();
+        if(prepCourts.length !== 3) prepCourts = [[null,null,null,null], [null,null,null,null], [null,null,null,null]];
+        
+        renderAll();
+        loadBgImage();
+        initVoices();
+    };
+
+    function initLevelSelect() {
+        const s = document.getElementById('pLevel'); s.innerHTML = '';
+        for(let i=3; i<=15; i++) {
+            const opt = document.createElement('option');
+            opt.value = i; opt.innerText = i+"級";
+            if(i===6) opt.selected = true;
+            s.appendChild(opt);
+        }
+    }
+
+    // --- Voice Logic ---
+    function initVoices() {
+        window.speechSynthesis.onvoiceschanged = () => {
+            availableVoices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh'));
+        };
+        availableVoices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh'));
+    }
+
+    function speakCourt(i) {
+        const names = courts[i].filter(x=>x).map(x=>x.name);
+        if(names.length === 0) return alert("無人");
+
+        const text = `第${i+1}場地，請${names.join('、')}上場`;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-TW';
+        utterance.rate = 1;
+
+        const genderPref = document.getElementById('voiceSelect').value;
+        let selectedVoice = null;
+
+        if (availableVoices.length > 0) {
+            if (genderPref === 'male') {
+                selectedVoice = availableVoices.find(v => v.name.includes('Male') || v.name.includes('Man') || v.name.includes('Danny') || v.name.includes('Zhanyuan') || v.name.includes('Kangkang'));
+            } else {
+                selectedVoice = availableVoices.find(v => v.name.includes('Female') || v.name.includes('Woman') || v.name.includes('Huihui') || v.name.includes('Yaoyao') || v.name.includes('Hanhan') || v.name.includes('Ting-Ting'));
+            }
+            if (!selectedVoice) selectedVoice = availableVoices[0];
+            utterance.voice = selectedVoice;
+        }
+
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- CSV Import ---
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            let content = e.target.result;
+            if(isContentValid(content)) { processCSVContent(content); }
+            else {
+                const reader2 = new FileReader();
+                reader2.onload = (e2) => processCSVContent(e2.target.result);
+                reader2.readAsText(file, 'Big5');
+            }
+            event.target.value = '';
+        };
+        reader.readAsText(file);
+    }
+    function isContentValid(c) { return c.includes(',') || c.includes('姓名') || c.includes('Name'); }
+    
+    function processCSVContent(content) {
+        if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
+        const lines = content.split(/\r\n|\n|\r/);
+        let added = 0;
+        
+        // Capture Batch Time ONCE
+        const batchTime = getCurrentTimeStr();
+
+        lines.forEach(line => {
+            const parts = line.split(',');
+            if (parts.length >= 2) {
+                const name = parts[0].trim().replace(/^"|"$/g, '');
+                const level = parseInt(parts[1].replace(/[^0-9]/g, ''));
+                if (!name.includes("姓名") && !isNaN(level)) {
+                    if (!players.some(p => p.name === name)) {
+                        createPlayer(name, level, batchTime); // Use batch time
+                        added++;
+                    }
+                }
+            }
+        });
+        saveData(); renderPlayerList();
+        if(added>0) alert(`已匯入 ${added} 人 (到場時間: ${batchTime})`); else alert("匯入失敗，請檢查格式");
+    }
+
+    // Updated createPlayer to accept optional timeStr
+    function createPlayer(name, level, timeStr) {
+        players.push({
+            id: Date.now() + Math.random().toString(),
+            name, level, count: 0, lastPlayedTime: 0,
+            onCourt: false, isResting: false,
+            partnerId: null, blacklist: [],
+            arrivalTime: timeStr || getCurrentTimeStr() // Fallback to current if not provided
+        });
+    }
+
+    // --- Core Player Mgmt ---
+    function addPlayer() {
+        const n = document.getElementById('pName').value.trim();
+        const l = parseInt(document.getElementById('pLevel').value);
+        if(!n) return alert("請輸入姓名");
+        if(players.some(p=>p.name===n)) return alert("姓名重複");
+        
+        // Manual add gets current system time
+        createPlayer(n, l, getCurrentTimeStr());
+        
+        saveData(); renderPlayerList(); document.getElementById('pName').value='';
+    }
+
+    function removePlayer(id, evt) {
+        evt.stopPropagation();
+        if(!confirm("刪除此人?")) return;
+        players = players.filter(p=>p.id!==id);
+        courts = courts.map(c => c.map(p => (p && p.id===id)?null:p));
+        prepCourts = prepCourts.map(row => row.map(p => (p && p.id===id)?null:p));
+        saveData(); renderAll();
+    }
+
+    function toggleRest(id, evt) {
+        evt.stopPropagation();
+        const p = players.find(x=>x.id===id);
+        if(p) { p.isResting = !p.isResting; }
+        saveData(); renderPlayerList();
+    }
+
+    function renamePlayer(id) {
+        const p = players.find(x=>x.id===id);
+        if(!p) return;
+        const newName = prompt("修改名字:", p.name);
+        if(newName && newName.trim() !== "") {
+            p.name = newName.trim();
+            saveData(); renderAll();
+        }
+    }
+
+    // --- Court Swap ---
+    function initiateSwap(idx) {
+        if (swapSourceIndex === null) {
+            swapSourceIndex = idx;
+            renderCourts();
+        } else {
+            if (swapSourceIndex !== idx) {
+                const temp = [...courts[swapSourceIndex]];
+                courts[swapSourceIndex] = [...courts[idx]];
+                courts[idx] = temp;
+                saveData();
+            }
+            swapSourceIndex = null;
+            renderCourts();
+        }
+    }
+
+    // --- Prep Area Logic ---
+    function clickPrepSlot(rowIdx, slotIdx) {
+        if (selectedPlayerId) {
+            const p = players.find(x=>x.id===selectedPlayerId);
+            if(!p) return;
+            if(p.onCourt) return alert("該球員已在場上");
+            if(prepCourts.some(row => row.some(x => x && x.id === p.id))) return alert("已在備戰區");
+            
+            let current = prepCourts[rowIdx].filter(x=>x);
+            let val = checkGroupValidityWithReason([...current, p], 'B'); 
+            if(!val.valid && !confirm(`規則警告: ${val.reason}，要排入嗎?`)) return;
+
+            prepCourts[rowIdx][slotIdx] = p;
+            selectedPlayerId = null;
+            saveData(); renderAll();
+        }
+    }
+    
+    function removePrepSlot(rowIdx, slotIdx, evt) {
+        evt.stopPropagation();
+        prepCourts[rowIdx][slotIdx] = null;
+        saveData(); renderAll();
+    }
+
+    function autoFillPrep(rowIdx) {
+        const emptyIndices = prepCourts[rowIdx].map((p,i)=>p===null?i:-1).filter(i=>i!==-1);
+        if(emptyIndices.length === 0) return alert("此備戰列已滿");
+        
+        let current = prepCourts[rowIdx].filter(x=>x);
+        let pool = getSortedWaitingList().filter(p => !prepCourts.some(r => r.includes(p)));
+        
+        if(current.length > 0) pool = pool.filter(p => isGroupValid([...current, p], 'B'));
+
+        const match = findPartialMatch(pool, emptyIndices.length, current, 'B');
+        if(match.length === emptyIndices.length) {
+            match.forEach((p, i) => prepCourts[rowIdx][emptyIndices[i]] = p);
+            saveData(); renderAll();
+        } else {
+            alert("找不到適合的人選");
+        }
+    }
+
+    function clearPrep(rowIdx) { prepCourts[rowIdx] = [null,null,null,null]; saveData(); renderAll(); }
+
+    function movePrepToCourtStart(rowIdx) {
+        if(prepCourts[rowIdx].every(p=>p===null)) return alert("此備戰列是空的");
+        movingPrepIndex = rowIdx;
+        renderPrep(); renderCourts();
+    }
+
+    function movePrepToCourtEnd(courtIdx) {
+        if(movingPrepIndex === null) return;
+        if(courts[courtIdx].some(p=>p!==null)) {
+            if(!confirm("該場地已有球員，確定要覆蓋嗎？")) {
+                movingPrepIndex = null; renderAll(); return;
+            }
+            courts[courtIdx].forEach(p => { if(p) { p.onCourt = false; } });
+        }
+
+        courts[courtIdx] = [...prepCourts[movingPrepIndex]];
+        courts[courtIdx].forEach(p => { if(p) { p.onCourt = true; p.count++; } });
+        
+        prepCourts[movingPrepIndex] = [null,null,null,null];
+        movingPrepIndex = null;
+        saveData(); renderAll();
+    }
+
+    // --- Main Court Interaction ---
+    function updateCourtRule(courtIdx, val) {
+        courtRules[courtIdx] = val;
+        saveData();
+    }
+
+    function clickSlot(courtIdx, slotIdx) {
+        if (movingPrepIndex !== null) { movePrepToCourtEnd(courtIdx); return; }
+        if (swapSourceIndex !== null) { initiateSwap(courtIdx); return; }
+
+        if (selectedPlayerId) {
+            const p = players.find(x=>x.id===selectedPlayerId);
+            if(!p) return;
+            if(p.onCourt) return alert("已在場上");
+            if(prepCourts.some(r => r.some(x => x && x.id === p.id))) return alert("已在備戰區");
+
+            const court = courts[courtIdx];
+            const current = court.filter(x=>x);
+            const rule = courtRules[courtIdx] || 'B';
+            const val = checkGroupValidityWithReason([...current, p], rule);
+            
+            if(!val.valid && !confirm(`規則警告: ${val.reason}，要排入嗎?`)) return;
+
+            court[slotIdx] = p;
+            p.onCourt = true; p.count++;
+
+            if(p.partnerId) {
+                const partner = players.find(x=>x.id===p.partnerId);
+                if(partner && !partner.onCourt) {
+                    const pIdx = (slotIdx%2===0)?slotIdx+1:slotIdx-1;
+                    if(court[pIdx]===null) {
+                        const current2 = court.filter(x=>x); 
+                        if(checkGroupValidityWithReason([...current2, partner], rule).valid || confirm(`搭檔 ${partner.name} 有衝突，要強制加入嗎?`)) {
+                            court[pIdx] = partner;
+                            partner.onCourt = true; partner.count++;
+                        }
+                    }
+                }
+            }
+            selectedPlayerId = null; saveData(); renderAll();
+        }
+    }
+
+    function removeSlot(courtIdx, slotIdx, evt) {
+        evt.stopPropagation();
+        const p = courts[courtIdx][slotIdx];
+        if(p) {
+            p.onCourt = false; p.count--; if(p.count<0) p.count=0;
+            courts[courtIdx][slotIdx] = null;
+            saveData(); renderAll();
+        }
+    }
+
+    // --- Logic ---
+    function checkGroupValidityWithReason(group, ruleCode) {
+        const levels = group.map(p=>p.level);
+        for(let i=0; i<group.length; i++) {
+            for(let j=i+1; j<group.length; j++) {
+                if(group[i].blacklist && group[i].blacklist.includes(group[j].id))
+                    return {valid:false, reason:`迴避設定 (${group[i].name} X ${group[j].name})`};
+            }
+        }
+        if (ruleCode === 'C') return {valid:true}; 
+        if (ruleCode === 'B') { 
+            const hasLow = levels.some(l => l>=3 && l<=6);
+            const hasHigh = levels.some(l => l>=8);
+            if(hasLow && hasHigh) return {valid:false, reason:"等級分組限制"};
+        }
+        if (ruleCode === 'A') { 
+            if (group.length === 4) {
+                const t1 = group[0].level + group[1].level;
+                const t2 = group[2].level + group[3].level;
+                if (Math.abs(t1 - t2) > 4) return {valid:false, reason:`實力差距過大 (${Math.abs(t1-t2)})`};
+            }
+        }
+        return {valid:true};
+    }
+
+    function isGroupValid(group, rule) { return checkGroupValidityWithReason(group, rule).valid; }
+
+    function autoAssignAll() {
+        const n = parseInt(document.getElementById('courtCount').value);
+        for(let i=0; i<n; i++) autoAssignSingleLogic(i, false);
+        saveData(); renderAll();
+    }
+    
+    function autoAssignSingle(i) {
+        if(autoAssignSingleLogic(i, true)) { saveData(); renderAll(); }
+    }
+
+    function autoAssignSingleLogic(courtIdx, alertOnFail) {
+        const court = courts[courtIdx];
+        const empties = court.map((p,i)=>p===null?i:-1).filter(i=>i!==-1);
+        if(empties.length===0) { if(alertOnFail) alert("場地已滿"); return false; }
+
+        const current = court.filter(x=>x);
+        let pool = getSortedWaitingList();
+        const rule = courtRules[courtIdx] || 'B';
+
+        if (current.length > 0) pool = pool.filter(p => isGroupValid([...current, p], rule));
+
+        const match = findPartialMatch(pool, empties.length, current, rule);
+        if(match.length === empties.length) {
+            match.forEach((p, i) => {
+                court[empties[i]] = p;
+                p.onCourt = true; p.count++;
+            });
+            return true;
+        } else {
+            if(alertOnFail) alert("無適合人選");
+            return false;
+        }
+    }
+
+    function findPartialMatch(pool, needed, existing, rule) {
+        let result = [];
+        let used = new Set();
+        const check = (cands) => isGroupValid([...existing, ...result, ...cands], rule);
+
+        for(let i=0; i<pool.length; i++) {
+            if(result.length === needed) break;
+            let p1 = pool[i];
+            if(used.has(p1.id)) continue;
+
+            if(p1.partnerId) {
+                if(needed - result.length >= 2) {
+                    let p2 = pool.find(x=>x.id===p1.partnerId);
+                    if(p2 && !used.has(p2.id)) {
+                        if(check([p1, p2])) {
+                            result.push(p1, p2); used.add(p1.id); used.add(p2.id);
+                        }
+                    }
+                }
+            } else {
+                if(check([p1])) { result.push(p1); used.add(p1.id); }
+            }
+        }
+        if(result.length === needed && (result.length + existing.length === 4) && rule === 'A') {
+             if(!isGroupValid([...existing, ...result], rule)) return [];
+        }
+        return result.length === needed ? result : [];
+    }
+
+    function getSortedWaitingList() {
+        return players.filter(p => !p.onCourt && !p.isResting && !prepCourts.some(r=>r.includes(p))).sort((a,b) => {
+            if(a.count !== b.count) return a.count - b.count;
+            return (a.lastPlayedTime||0) - (b.lastPlayedTime||0);
+        });
+    }
+
+    // --- UI Render ---
+    function renderCourts() {
+        const n = parseInt(document.getElementById('courtCount').value);
+        const grid = document.getElementById('courtsGrid');
+        
+        while(courts.length < n) { courts.push([null,null,null,null]); courtRules.push('B'); }
+        if(courts.length > n) { courts.length = n; courtRules.length = n; }
+        for(let k=0; k<n; k++) if(!courtRules[k]) courtRules[k] = 'B';
+
+        let html = '';
+        courts.forEach((court, i) => {
+            const isTarget = (movingPrepIndex !== null);
+            const isSwapping = (swapSourceIndex === i);
+            const r = courtRules[i];
+            
+            const slots = court.map((p, si) => {
+                if(!p) return `<div class="slot" onclick="clickSlot(${i},${si})"><span style="color:#ccc;font-size:20px;">+</span></div>`;
+                const cls = (p.level<=6)?'lvl-low':(p.level>=11?'lvl-high':'lvl-mid');
+                return `
+                <div class="slot filled" onclick="clickSlot(${i},${si})">
+                    <div class="remove-slot-btn" onclick="removeSlot(${i},${si},event)">×</div>
+                    <div class="slot-content">
+                        <div class="slot-name">${p.name}</div>
+                        <div class="slot-level tag ${cls}">${p.level}</div>
+                    </div>
+                </div>`;
+            });
+
+            html += `
+            <div class="court ${isTarget?'target-mode':''} ${isSwapping?'swapping':''}" ${isTarget?`onclick="movePrepToCourtEnd(${i})"`:''}>
+                <div class="court-header">
+                    <div class="court-controls">
+                        <div class="court-title">場地 ${i+1}</div>
+                        <select class="rule-select" onchange="updateCourtRule(${i}, this.value)" onclick="event.stopPropagation()">
+                            <option value="B" ${r==='B'?'selected':''}>B:分級</option>
+                            <option value="A" ${r==='A'?'selected':''}>A:均衡</option>
+                            <option value="C" ${r==='C'?'selected':''}>C:亂鬥</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="court-actions" style="margin-bottom:8px;">
+                    ${!isTarget ? `
+                    <button class="btn-court-action btn-swap" onclick="event.stopPropagation(); initiateSwap(${i})">⇄ 交換</button>
+                    <button class="btn-court-action btn-auto-court" onclick="event.stopPropagation(); autoAssignSingle(${i})">🎲 自動</button>
+                    <button class="btn-court-action btn-speak" onclick="event.stopPropagation(); speakCourt(${i})">📣 叫名</button>
+                    <button class="btn-court-action btn-clear" onclick="event.stopPropagation(); clearCourt(${i})">🏁 結束</button>
+                    ` : '<div style="width:100%;text-align:center;color:red;font-weight:bold;padding:5px;">👇 點擊此處移入</div>'}
+                </div>
+                <div class="team">${slots[0]}${slots[1]}</div>
+                <div class="net"></div>
+                <div class="team">${slots[2]}${slots[3]}</div>
+            </div>`;
+        });
+        grid.innerHTML = html;
+        renderPrep();
+    }
+
+    function renderPrep() {
+        const container = document.getElementById('prepContainer');
+        let html = '';
+        prepCourts.forEach((row, rIdx) => {
+            const isMoving = (movingPrepIndex === rIdx);
+            const slots = row.map((p, i) => {
+                if(!p) return `<div class="slot" onclick="clickPrepSlot(${rIdx},${i})"><span style="color:#ccc;">+</span></div>`;
+                const cls = (p.level<=6)?'lvl-low':(p.level>=11?'lvl-high':'lvl-mid');
+                return `<div class="slot filled" onclick="clickPrepSlot(${rIdx},${i})">
+                    <div class="remove-slot-btn" onclick="removePrepSlot(${rIdx},${i},event)">×</div>
+                    <div class="slot-content"><div class="slot-name">${p.name}</div><div class="slot-level tag ${cls}">${p.level}</div></div>
+                </div>`;
+            }).join('');
+
+            html += `
+            <div class="prep-row ${isMoving?'moving-mode':''}">
+                <div class="prep-header">
+                    <span class="prep-label">備戰區 ${String.fromCharCode(65+rIdx)}</span>
+                    <div class="prep-actions">
+                        <button class="btn-court-action btn-auto-court" onclick="autoFillPrep(${rIdx})">🎲 自動</button>
+                        <button class="btn-court-action btn-move-in" onclick="movePrepToCourtStart(${rIdx})">🚀 入場</button>
+                        <button class="btn-court-action btn-clear" onclick="clearPrep(${rIdx})">清除</button>
+                    </div>
+                </div>
+                <div class="team" style="margin-top:5px;">${slots}</div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function renderPlayerList() {
+        const waitList = document.getElementById('playerList');
+        const restList = document.getElementById('restList');
+        waitList.innerHTML = ''; restList.innerHTML = '';
+        
+        const waiting = players.filter(p => !p.onCourt && !p.isResting && !prepCourts.some(r=>r.includes(p)));
+        document.getElementById('waitCount').innerText = waiting.length;
+
+        waiting.sort((a,b) => (a.count - b.count) || (a.lastPlayedTime - b.lastPlayedTime));
+
+        const createCard = (p, isRest) => {
+            const cls = (p.level<=6)?'lvl-low':(p.level>=11?'lvl-high':'lvl-mid');
+            const partner = p.partnerId ? '❤️' : '';
+            const bl = p.blacklist.length ? '🚫' : '';
+            const sel = selectedPlayerId===p.id ? 'selected' : '';
+            const actionBtn = isRest 
+                ? `<button class="btn-mini btn-active" onclick="toggleRest('${p.id}',event)">⬆️</button>`
+                : `<button class="btn-mini btn-rest" onclick="toggleRest('${p.id}',event)">💤</button>`;
+            
+            // Add timeStr
+            const timeStr = p.arrivalTime ? `🕒${p.arrivalTime}` : '';
+
+            return `
+            <div class="player-card ${sel} ${isRest?'resting':''}" onclick="selectPlayer('${p.id}')">
+                <div style="display:flex;align-items:center;">
+                    <span class="tag ${cls}">${p.level}</span>
+                    <span class="name-edit" ondblclick="event.stopPropagation(); renamePlayer('${p.id}')">${partner}${bl}${p.name}</span>
+                </div>
+                <div style="display:flex;align-items:center;">
+                    <span class="time-badge">${timeStr}</span>
+                    <span class="count-badge">${p.count}</span>
+                    ${actionBtn}
+                    <span class="delete-btn" onclick="removePlayer('${p.id}',event)">×</span>
+                </div>
+            </div>`;
+        };
+
+        waiting.forEach(p => waitList.innerHTML += createCard(p, false));
+        players.filter(p => p.isResting).forEach(p => restList.innerHTML += createCard(p, true));
+    }
+
+    function selectPlayer(id) { selectedPlayerId = (selectedPlayerId===id)?null:id; renderPlayerList(); renderPrep(); renderCourts(); }
+
+    function renderHistory() {
+        const ul = document.getElementById('historyListMain'); ul.innerHTML = '';
+        matchHistory.forEach((m, idx) => {
+            const names = m.detail.map(d=>`${d.name}(${d.level})`).join('+');
+            const num = matchHistory.length - idx;
+            ul.innerHTML += `
+            <li class="history-item">
+                <div class="history-info">
+                    <span class="match-badge">#${num}</span>
+                    <span style="font-size:11px;color:#888;">${m.time}</span>
+                    <span>${names}</span>
+                </div>
+                <span class="delete-hist-btn" onclick="deleteHistoryItem(${idx})">×</span>
+            </li>`;
+        });
+    }
+
+    function deleteHistoryItem(idx) {
+        if(confirm("刪除此筆紀錄?")) { matchHistory.splice(idx, 1); saveData(); renderHistory(); }
+    }
+
+    function clearCourt(i) {
+        const c = courts[i]; if(!c.some(x=>x)) return;
+        if(!confirm("結束並清空?")) return;
+        const pIds = c.filter(x=>x).map(x=>x.id);
+        const pDet = c.filter(x=>x).map(x=>({name:x.name, level:x.level}));
+        if(pIds.length>0) {
+            matchHistory.unshift({id:Date.now(), time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), playerIds:pIds, detail:pDet});
+            if(matchHistory.length>200) matchHistory.pop();
+        }
+        const now = Date.now();
+        courts[i].forEach((p, idx) => { if(p){ p.onCourt=false; p.lastPlayedTime=now; courts[i][idx]=null; }});
+        saveData(); renderAll();
+    }
+
+    // --- Persist ---
+    function saveData() {
+        const d = { 
+            players, matchHistory, 
+            courts: courts.map(c=>c.map(p=>p?p.id:null)),
+            prepCourts: prepCourts.map(r=>r.map(p=>p?p.id:null)), 
+            nCourts: document.getElementById('courtCount').value,
+            courtRules,
+            voice: document.getElementById('voiceSelect').value
+        };
+        localStorage.setItem('badAppV5', JSON.stringify(d));
+    }
+    function loadData() {
+        const d = JSON.parse(localStorage.getItem('badAppV5'));
+        if(d) {
+            players = (d.players||[]).map(p => ({
+                ...p, 
+                isResting: p.isResting||false, 
+                blacklist: p.blacklist||[], 
+                partnerId: p.partnerId||null,
+                arrivalTime: p.arrivalTime || '' // Ensure field exists
+            }));
+            matchHistory = d.matchHistory || [];
+            document.getElementById('courtCount').value = d.nCourts || 4;
+            courtRules = d.courtRules || [];
+            if(d.voice) document.getElementById('voiceSelect').value = d.voice;
+            
+            courts = (d.courts || []).map(ids => ids.map(id => players.find(p=>p.id===id)||null));
+            if(d.prepCourts) {
+                prepCourts = d.prepCourts.map(ids => ids.map(id => players.find(p=>p.id===id)||null));
+            }
+        }
+    }
+    function saveSettings() { saveData(); }
+    
+    function clearAllData() {
+        if(confirm("清除所有資料?")) {
+            localStorage.removeItem('badAppV5'); localStorage.removeItem('badBg');
+            location.reload();
+        }
+    }
+    function clearHistory() { if(confirm("清空紀錄?")) { matchHistory=[]; saveData(); renderHistory(); }}
+    function resetAllCourts() { if(confirm("清空場地?")) { courts.forEach(c=>c.forEach(p=>{if(p){p.onCourt=false; p.lastPlayedTime=Date.now();}})); courts=courts.map(c=>[null,null,null,null]); saveData(); renderAll(); }}
+    function showStats() {
+        const b = document.getElementById('statsBody'); b.innerHTML='';
+        [...players].sort((a,b)=>b.count-a.count).forEach(p=>{
+            const t = p.arrivalTime || '-';
+            b.innerHTML+=`<tr><td>${p.name}</td><td>${p.level}</td><td>${p.count}</td><td>${t}</td></tr>`;
+        });
+        document.getElementById('statsModal').style.display='flex';
+    }
+    function closeModal(id) { document.getElementById(id).style.display='none'; }
+    function renderAll() { renderPlayerList(); renderCourts(); renderPrep(); renderHistory(); }
+    
+    function handleBgUpload(e) {
+        const f = e.target.files[0]; if(!f) return;
+        const r = new FileReader();
+        r.onload = (evt) => { try{localStorage.setItem('badBg', evt.target.result); loadBgImage();}catch(e){alert("圖片太大");} };
+        r.readAsDataURL(f);
+    }
+    function loadBgImage() { const d = localStorage.getItem('badBg'); if(d) document.getElementById('bgLayer').style.backgroundImage=`url('${d}')`; }
+
+    // ... (Show Partner/Blacklist Modals: Same as before) ...
+    function showPartnerModal() {
+        const s1 = document.getElementById('partnerP1'), s2 = document.getElementById('partnerP2');
+        s1.innerHTML = '<option value="">選人...</option>'; s2.innerHTML = '<option value="">選人...</option>';
+        players.filter(p=>!p.partnerId).sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{
+            const o = `<option value="${p.id}">${p.name}</option>`; s1.innerHTML+=o; s2.innerHTML+=o;
+        });
+        const tb = document.getElementById('partnerListBody'); tb.innerHTML='';
+        const done = new Set();
+        players.forEach(p => {
+            if(p.partnerId && !done.has(p.id)) {
+                const p2 = players.find(x=>x.id===p.partnerId);
+                if(p2) {
+                    done.add(p.id); done.add(p2.id);
+                    tb.innerHTML += `<tr><td>${p.name}</td><td>${p2.name}</td><td><button class="btn-mini" style="background:red;color:white" onclick="breakPartner('${p.id}')">解散</button></td></tr>`;
+                }
+            }
+        });
+        document.getElementById('partnerModal').style.display='flex';
+    }
+    function addPartner() {
+        const id1 = document.getElementById('partnerP1').value, id2 = document.getElementById('partnerP2').value;
+        if(!id1 || !id2 || id1===id2) return alert("請選兩人");
+        players.find(p=>p.id===id1).partnerId = id2; players.find(p=>p.id===id2).partnerId = id1;
+        saveData(); showPartnerModal(); renderPlayerList();
+    }
+    function breakPartner(id) {
+        const p1 = players.find(p=>p.id===id);
+        if(p1 && p1.partnerId) {
+            const p2 = players.find(x=>x.id===p1.partnerId);
+            p1.partnerId = null; if(p2) p2.partnerId = null;
+            saveData(); showPartnerModal(); renderPlayerList();
+        }
+    }
+    function showBlacklistModal() {
+        const s1 = document.getElementById('blP1'), s2 = document.getElementById('blP2');
+        s1.innerHTML = '<option value="">選人...</option>'; s2.innerHTML = '<option value="">選人...</option>';
+        players.sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{
+            const o = `<option value="${p.id}">${p.name}</option>`; s1.innerHTML+=o; s2.innerHTML+=o;
+        });
+        const tb = document.getElementById('blacklistBody'); tb.innerHTML='';
+        const done = new Set();
+        players.forEach(p => {
+            p.blacklist.forEach(tid => {
+                const key = [p.id, tid].sort().join('-');
+                if(!done.has(key)) {
+                    const t = players.find(x=>x.id===tid);
+                    if(t) {
+                        done.add(key);
+                        tb.innerHTML += `<tr><td>${p.name}</td><td>${t.name}</td><td><button class="btn-mini" onclick="removeBlacklist('${p.id}','${tid}')">取消</button></td></tr>`;
+                    }
+                }
+            });
+        });
+        document.getElementById('blacklistModal').style.display='flex';
+    }
+    function addBlacklist() {
+        const id1 = document.getElementById('blP1').value, id2 = document.getElementById('blP2').value;
+        if(!id1 || !id2 || id1===id2) return alert("請選兩人");
+        const p1 = players.find(p=>p.id===id1), p2 = players.find(p=>p.id===id2);
+        if(!p1.blacklist.includes(id2)) p1.blacklist.push(id2);
+        if(!p2.blacklist.includes(id1)) p2.blacklist.push(id1);
+        saveData(); showBlacklistModal();
+    }
+    function removeBlacklist(id1, id2) {
+        const p1 = players.find(p=>p.id===id1), p2 = players.find(p=>p.id===id2);
+        if(p1) p1.blacklist = p1.blacklist.filter(x=>x!==id2);
+        if(p2) p2.blacklist = p2.blacklist.filter(x=>x!==id1);
+        saveData(); showBlacklistModal();
+    }
+    function exportCSV() {
+        const link = document.createElement("a");
+        link.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURI("姓名,程度,上場次數,到場時間\n" + players.map(p=>`${p.name},${p.level},${p.count},${p.arrivalTime||''}`).join('\n'));
+        link.download = `統計.csv`; link.click();
+    }
+</script>
+</body>
+</html>
