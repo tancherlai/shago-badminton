@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>夏果羽球排點助手 (到場時間版)</title>
+    <title>夏果羽球排點助手 (教練課+修程度版)</title>
     <style>
         :root {
             --primary: #2c3e50;
@@ -107,6 +107,7 @@
         .tag {
             padding: 2px 6px; border-radius: 4px; color: white; font-size: 11px;
             font-weight: bold; margin-right: 5px; min-width: 20px; text-align: center;
+            cursor: help; /* Hint editable */
         }
         .lvl-low { background-color: #27ae60; } 
         .lvl-mid { background-color: #2980b9; } 
@@ -148,6 +149,14 @@
         }
         .court.swapping { box-shadow: 0 0 15px 5px yellow; border-color: yellow; animation: pulse 1s infinite; }
         .court.target-mode { box-shadow: 0 0 15px 5px #e74c3c; border-color: #e74c3c; cursor: pointer; transform: scale(1.02); }
+        .court.coaching-mode { background: #95a5a6; border-color: #7f8c8d; }
+
+        .coaching-overlay {
+            position: absolute; top: 50px; left: 0; width: 100%; height: calc(100% - 50px);
+            background: rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 24px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 5;
+        }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
@@ -167,6 +176,8 @@
         .btn-auto-court { background: #d35400; } .btn-auto-court:hover { background: #e67e22; }
         .btn-swap { background: #8e44ad; } .btn-swap:hover { background: #9b59b6; }
         .btn-move-in { background: #16a085; border:1px solid #16a085; } .btn-move-in:hover { background: #1abc9c; }
+        .btn-coach { background: #2c3e50; } .btn-coach:hover { background: #34495e; }
+        .btn-coach.active { background: #c0392b; border-color: #c0392b; }
 
         .net { height: 4px; background: white; width: 100%; margin: 5px 0; opacity: 0.8; }
         .team { display: flex; gap: 10px; justify-content: space-around; }
@@ -240,6 +251,7 @@
             <select id="voiceSelect" onchange="saveSettings()">
                 <option value="female">👩 女聲 (預設)</option>
                 <option value="male">👨 男聲 (嘗試)</option>
+                <option value="tw">🦜 台語 (需裝置支援)</option>
             </select>
         </div>
 
@@ -333,6 +345,7 @@
     let prepCourts = [[null,null,null,null], [null,null,null,null], [null,null,null,null]];
     let matchHistory = []; 
     let courtRules = []; 
+    let courtCoaching = []; // [true, false...]
     
     let selectedPlayerId = null;
     let swapSourceIndex = null; 
@@ -370,12 +383,13 @@
     // --- Voice Logic ---
     function initVoices() {
         window.speechSynthesis.onvoiceschanged = () => {
-            availableVoices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh'));
+            availableVoices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh') || v.lang.includes('nan') || v.lang.includes('min'));
         };
-        availableVoices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh'));
+        availableVoices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('zh') || v.lang.includes('nan') || v.lang.includes('min'));
     }
 
     function speakCourt(i) {
+        if (courtCoaching[i]) return; // Silent if coaching
         const names = courts[i].filter(x=>x).map(x=>x.name);
         if(names.length === 0) return alert("無人");
 
@@ -390,6 +404,9 @@
         if (availableVoices.length > 0) {
             if (genderPref === 'male') {
                 selectedVoice = availableVoices.find(v => v.name.includes('Male') || v.name.includes('Man') || v.name.includes('Danny') || v.name.includes('Zhanyuan') || v.name.includes('Kangkang'));
+            } else if (genderPref === 'tw') {
+                selectedVoice = availableVoices.find(v => v.lang.includes('nan') || v.name.includes('Min') || v.name.includes('Hokkien') || v.name.includes('Taiwanese'));
+                if (!selectedVoice) selectedVoice = availableVoices.find(v => v.lang === 'zh-TW');
             } else {
                 selectedVoice = availableVoices.find(v => v.name.includes('Female') || v.name.includes('Woman') || v.name.includes('Huihui') || v.name.includes('Yaoyao') || v.name.includes('Hanhan') || v.name.includes('Ting-Ting'));
             }
@@ -424,8 +441,6 @@
         if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
         const lines = content.split(/\r\n|\n|\r/);
         let added = 0;
-        
-        // Capture Batch Time ONCE
         const batchTime = getCurrentTimeStr();
 
         lines.forEach(line => {
@@ -435,7 +450,7 @@
                 const level = parseInt(parts[1].replace(/[^0-9]/g, ''));
                 if (!name.includes("姓名") && !isNaN(level)) {
                     if (!players.some(p => p.name === name)) {
-                        createPlayer(name, level, batchTime); // Use batch time
+                        createPlayer(name, level, batchTime);
                         added++;
                     }
                 }
@@ -445,14 +460,13 @@
         if(added>0) alert(`已匯入 ${added} 人 (到場時間: ${batchTime})`); else alert("匯入失敗，請檢查格式");
     }
 
-    // Updated createPlayer to accept optional timeStr
     function createPlayer(name, level, timeStr) {
         players.push({
             id: Date.now() + Math.random().toString(),
             name, level, count: 0, lastPlayedTime: 0,
             onCourt: false, isResting: false,
             partnerId: null, blacklist: [],
-            arrivalTime: timeStr || getCurrentTimeStr() // Fallback to current if not provided
+            arrivalTime: timeStr || getCurrentTimeStr()
         });
     }
 
@@ -462,10 +476,7 @@
         const l = parseInt(document.getElementById('pLevel').value);
         if(!n) return alert("請輸入姓名");
         if(players.some(p=>p.name===n)) return alert("姓名重複");
-        
-        // Manual add gets current system time
         createPlayer(n, l, getCurrentTimeStr());
-        
         saveData(); renderPlayerList(); document.getElementById('pName').value='';
     }
 
@@ -495,13 +506,30 @@
         }
     }
 
+    function editLevel(id) {
+        const p = players.find(x=>x.id===id);
+        if(!p) return;
+        const val = prompt(`修改 ${p.name} 的程度 (3-15):`, p.level);
+        if(val) {
+            const n = parseInt(val);
+            if(!isNaN(n) && n>=3 && n<=15) {
+                p.level = n;
+                saveData(); renderAll();
+            } else {
+                alert("請輸入有效數字 3-15");
+            }
+        }
+    }
+
     // --- Court Swap ---
     function initiateSwap(idx) {
+        if (courtCoaching[idx]) return alert("教練課場地無法交換");
         if (swapSourceIndex === null) {
             swapSourceIndex = idx;
             renderCourts();
         } else {
             if (swapSourceIndex !== idx) {
+                if (courtCoaching[swapSourceIndex]) return alert("教練課場地無法交換");
                 const temp = [...courts[swapSourceIndex]];
                 courts[swapSourceIndex] = [...courts[idx]];
                 courts[idx] = temp;
@@ -564,6 +592,8 @@
 
     function movePrepToCourtEnd(courtIdx) {
         if(movingPrepIndex === null) return;
+        if(courtCoaching[courtIdx]) return alert("此為教練場地，無法移入");
+
         if(courts[courtIdx].some(p=>p!==null)) {
             if(!confirm("該場地已有球員，確定要覆蓋嗎？")) {
                 movingPrepIndex = null; renderAll(); return;
@@ -585,7 +615,20 @@
         saveData();
     }
 
+    function toggleCoaching(courtIdx) {
+        if(courts[courtIdx].some(p=>p!==null)) {
+            if(!confirm("切換為教練課將清空目前場上人員並退回候位區，確定嗎？")) return;
+            // Clear but keep stats, reset onCourt
+            courts[courtIdx].forEach(p => { if(p) p.onCourt = false; });
+            courts[courtIdx] = [null,null,null,null];
+        }
+        courtCoaching[courtIdx] = !courtCoaching[courtIdx];
+        saveData();
+        renderAll();
+    }
+
     function clickSlot(courtIdx, slotIdx) {
+        if(courtCoaching[courtIdx]) return; // Block
         if (movingPrepIndex !== null) { movePrepToCourtEnd(courtIdx); return; }
         if (swapSourceIndex !== null) { initiateSwap(courtIdx); return; }
 
@@ -670,6 +713,8 @@
     }
 
     function autoAssignSingleLogic(courtIdx, alertOnFail) {
+        if(courtCoaching[courtIdx]) { if(alertOnFail) alert("此為教練場地"); return false; }
+        
         const court = courts[courtIdx];
         const empties = court.map((p,i)=>p===null?i:-1).filter(i=>i!==-1);
         if(empties.length===0) { if(alertOnFail) alert("場地已滿"); return false; }
@@ -734,14 +779,15 @@
         const n = parseInt(document.getElementById('courtCount').value);
         const grid = document.getElementById('courtsGrid');
         
-        while(courts.length < n) { courts.push([null,null,null,null]); courtRules.push('B'); }
-        if(courts.length > n) { courts.length = n; courtRules.length = n; }
-        for(let k=0; k<n; k++) if(!courtRules[k]) courtRules[k] = 'B';
+        while(courts.length < n) { courts.push([null,null,null,null]); courtRules.push('B'); courtCoaching.push(false); }
+        if(courts.length > n) { courts.length = n; courtRules.length = n; courtCoaching.length = n; }
+        for(let k=0; k<n; k++) { if(!courtRules[k]) courtRules[k] = 'B'; if(courtCoaching[k]===undefined) courtCoaching[k]=false; }
 
         let html = '';
         courts.forEach((court, i) => {
             const isTarget = (movingPrepIndex !== null);
             const isSwapping = (swapSourceIndex === i);
+            const isCoach = courtCoaching[i];
             const r = courtRules[i];
             
             const slots = court.map((p, si) => {
@@ -757,12 +803,16 @@
                 </div>`;
             });
 
+            // Coaching Overlay
+            const overlay = isCoach ? `<div class="coaching-overlay">🏸 教練指導中 🏸</div>` : '';
+
             html += `
-            <div class="court ${isTarget?'target-mode':''} ${isSwapping?'swapping':''}" ${isTarget?`onclick="movePrepToCourtEnd(${i})"`:''}>
+            <div class="court ${isTarget?'target-mode':''} ${isSwapping?'swapping':''} ${isCoach?'coaching-mode':''}" ${isTarget?`onclick="movePrepToCourtEnd(${i})"`:''}>
+                ${overlay}
                 <div class="court-header">
                     <div class="court-controls">
                         <div class="court-title">場地 ${i+1}</div>
-                        <select class="rule-select" onchange="updateCourtRule(${i}, this.value)" onclick="event.stopPropagation()">
+                        <select class="rule-select" onchange="updateCourtRule(${i}, this.value)" onclick="event.stopPropagation()" ${isCoach?'disabled':''}>
                             <option value="B" ${r==='B'?'selected':''}>B:分級</option>
                             <option value="A" ${r==='A'?'selected':''}>A:均衡</option>
                             <option value="C" ${r==='C'?'selected':''}>C:亂鬥</option>
@@ -774,6 +824,7 @@
                     <button class="btn-court-action btn-swap" onclick="event.stopPropagation(); initiateSwap(${i})">⇄ 交換</button>
                     <button class="btn-court-action btn-auto-court" onclick="event.stopPropagation(); autoAssignSingle(${i})">🎲 自動</button>
                     <button class="btn-court-action btn-speak" onclick="event.stopPropagation(); speakCourt(${i})">📣 叫名</button>
+                    <button class="btn-court-action btn-coach ${isCoach?'active':''}" onclick="event.stopPropagation(); toggleCoaching(${i})">👨‍🏫 教練</button>
                     <button class="btn-court-action btn-clear" onclick="event.stopPropagation(); clearCourt(${i})">🏁 結束</button>
                     ` : '<div style="width:100%;text-align:center;color:red;font-weight:bold;padding:5px;">👇 點擊此處移入</div>'}
                 </div>
@@ -835,14 +886,13 @@
                 ? `<button class="btn-mini btn-active" onclick="toggleRest('${p.id}',event)">⬆️</button>`
                 : `<button class="btn-mini btn-rest" onclick="toggleRest('${p.id}',event)">💤</button>`;
             
-            // Add timeStr
             const timeStr = p.arrivalTime ? `🕒${p.arrivalTime}` : '';
 
             return `
             <div class="player-card ${sel} ${isRest?'resting':''}" onclick="selectPlayer('${p.id}')">
                 <div style="display:flex;align-items:center;">
-                    <span class="tag ${cls}">${p.level}</span>
-                    <span class="name-edit" ondblclick="event.stopPropagation(); renamePlayer('${p.id}')">${partner}${bl}${p.name}</span>
+                    <span class="tag ${cls}" ondblclick="event.stopPropagation(); editLevel('${p.id}')" title="雙擊修改程度">${p.level}</span>
+                    <span class="name-edit" ondblclick="event.stopPropagation(); renamePlayer('${p.id}')" title="雙擊修改名字">${partner}${bl}${p.name}</span>
                 </div>
                 <div style="display:flex;align-items:center;">
                     <span class="time-badge">${timeStr}</span>
@@ -881,6 +931,7 @@
     }
 
     function clearCourt(i) {
+        if(courtCoaching[i]) return;
         const c = courts[i]; if(!c.some(x=>x)) return;
         if(!confirm("結束並清空?")) return;
         const pIds = c.filter(x=>x).map(x=>x.id);
@@ -901,24 +952,25 @@
             courts: courts.map(c=>c.map(p=>p?p.id:null)),
             prepCourts: prepCourts.map(r=>r.map(p=>p?p.id:null)), 
             nCourts: document.getElementById('courtCount').value,
-            courtRules,
+            courtRules, courtCoaching,
             voice: document.getElementById('voiceSelect').value
         };
-        localStorage.setItem('badAppV5', JSON.stringify(d));
+        localStorage.setItem('badAppV6', JSON.stringify(d));
     }
     function loadData() {
-        const d = JSON.parse(localStorage.getItem('badAppV5'));
+        const d = JSON.parse(localStorage.getItem('badAppV6'));
         if(d) {
             players = (d.players||[]).map(p => ({
                 ...p, 
                 isResting: p.isResting||false, 
                 blacklist: p.blacklist||[], 
                 partnerId: p.partnerId||null,
-                arrivalTime: p.arrivalTime || '' // Ensure field exists
+                arrivalTime: p.arrivalTime || '' 
             }));
             matchHistory = d.matchHistory || [];
             document.getElementById('courtCount').value = d.nCourts || 4;
             courtRules = d.courtRules || [];
+            courtCoaching = d.courtCoaching || [];
             if(d.voice) document.getElementById('voiceSelect').value = d.voice;
             
             courts = (d.courts || []).map(ids => ids.map(id => players.find(p=>p.id===id)||null));
@@ -931,7 +983,7 @@
     
     function clearAllData() {
         if(confirm("清除所有資料?")) {
-            localStorage.removeItem('badAppV5'); localStorage.removeItem('badBg');
+            localStorage.removeItem('badAppV6'); localStorage.removeItem('badBg');
             location.reload();
         }
     }
@@ -956,7 +1008,7 @@
     }
     function loadBgImage() { const d = localStorage.getItem('badBg'); if(d) document.getElementById('bgLayer').style.backgroundImage=`url('${d}')`; }
 
-    // ... (Show Partner/Blacklist Modals: Same as before) ...
+    // ... (Partner/Blacklist Modals same) ...
     function showPartnerModal() {
         const s1 = document.getElementById('partnerP1'), s2 = document.getElementById('partnerP2');
         s1.innerHTML = '<option value="">選人...</option>'; s2.innerHTML = '<option value="">選人...</option>';
