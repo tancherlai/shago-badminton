@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>夏果羽球排點助手 (教練課+修程度版)</title>
+    <title>夏果羽球排點助手 (V20-匯入未到區版)</title>
     <style>
         :root {
             --primary: #2c3e50;
@@ -12,6 +12,11 @@
             --card-bg: rgba(255, 255, 255, 0.95);
             --text: #333;
             --prep-bg: #fffcf5;
+            
+            /* 場地顏色設定 */
+            --court-empty: #2ecc71;  /* 綠色 */
+            --court-busy: #34495e;   /* 深藍色 (有人) */
+            --court-coach: #95a5a6;  /* 灰色 (教練) */
         }
 
         body {
@@ -35,13 +40,13 @@
 
         h1, h2, h3, h4 { margin: 0.5em 0; }
         
-        .container { max-width: 1400px; width: 100%; display: flex; flex-direction: column; gap: 20px; }
+        .container { max-width: 98%; width: 100%; display: flex; flex-direction: column; gap: 15px; }
 
         /* Controls */
         .controls {
-            background: var(--card-bg); padding: 15px; border-radius: 10px;
+            background: var(--card-bg); padding: 10px 20px; border-radius: 10px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; flex-wrap: wrap;
-            gap: 15px; align-items: center; justify-content: space-between; backdrop-filter: blur(5px);
+            gap: 10px; align-items: center; justify-content: space-between; backdrop-filter: blur(5px);
         }
 
         .input-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -69,45 +74,50 @@
         .btn-mini { font-size: 12px; padding: 2px 6px; }
         .btn-rest { background-color: #7f8c8d; color: white; }
         .btn-active { background-color: #27ae60; color: white; }
+        .btn-absent { background-color: #95a5a6; color: white; }
+        .btn-arrive { background-color: #27ae60; color: white; }
+        
+        /* Universal Player Button */
+        .btn-universal { background-color: #f39c12; color: white; }
+        .btn-universal-off { background-color: #bdc3c7; color: #555; }
 
         /* Layout */
-        .main-area { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+        .main-area { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-start; }
 
         .column-box {
-            background: var(--card-bg); padding: 15px; border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-height: 85vh;
+            background: var(--card-bg); padding: 10px; border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-height: 90vh;
             display: flex; flex-direction: column; backdrop-filter: blur(5px);
         }
 
-        .scrollable-content { overflow-y: auto; flex: 1; padding-right: 5px; }
+        .scrollable-content { overflow-y: auto; flex: 1; padding-right: 2px; }
 
-        .col-players { flex: 1; min-width: 280px; }
-        .col-history { flex: 1; min-width: 320px; }
-        .col-courts {
-            flex: 2; min-width: 350px; background: transparent; box-shadow: none; padding: 0;
-            display: flex; flex-direction: column; gap: 20px;
-        }
+        .col-players { flex: 1; min-width: 250px; order: 1; }
+        .col-courts { flex: 3; min-width: 400px; order: 2; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+        .col-history { flex: 1; min-width: 250px; order: 3; }
 
         /* Player List */
         .section-header {
             font-size: 14px; font-weight: bold; color: #666; 
-            margin: 10px 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 3px;
+            margin: 5px 0; border-bottom: 1px solid #eee; padding-bottom: 3px;
         }
-        .player-list { display: flex; flex-direction: column; gap: 6px; }
+        .player-list { display: flex; flex-direction: column; gap: 5px; }
 
         .player-card {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 8px; border-radius: 6px; background: #f8f9fa;
+            padding: 6px 8px; border-radius: 6px; background: #f8f9fa;
             border: 1px solid #eee; cursor: pointer; user-select: none; transition: transform 0.1s;
         }
         .player-card:active { transform: scale(0.98); }
         .player-card.selected { border: 2px solid var(--primary); background: #e8f4fd; }
         .player-card.resting { opacity: 0.6; background: #eee; }
+        .player-card.absent { opacity: 0.6; background: #ddd; border-style: dashed; }
+        .player-card.universal-player { border-left: 4px solid #f1c40f; }
 
         .tag {
             padding: 2px 6px; border-radius: 4px; color: white; font-size: 11px;
             font-weight: bold; margin-right: 5px; min-width: 20px; text-align: center;
-            cursor: help; /* Hint editable */
+            cursor: help;
         }
         .lvl-low { background-color: #27ae60; } 
         .lvl-mid { background-color: #2980b9; } 
@@ -118,57 +128,65 @@
             display: flex; align-items: center; justify-content: center; font-size: 11px; margin-right: 5px;
         }
         
-        .time-badge {
-            font-size: 11px; color: #888; margin-right: 8px; font-family: monospace;
-        }
-
-        .name-edit { border-bottom: 1px dashed #999; cursor: text; }
+        .time-badge { font-size: 10px; color: #888; margin-right: 5px; font-family: monospace; }
+        .name-edit { border-bottom: 1px dashed #999; cursor: text; font-size: 14px; }
 
         /* Prep Area */
-        .prep-container { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+        .prep-controls-header { display: flex; justify-content: space-between; align-items: center; padding: 0 5px; margin-bottom: 5px;}
+        .prep-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 5px; }
         .prep-row {
             background: var(--prep-bg); border: 2px dashed #f39c12; border-radius: 8px;
-            padding: 8px 15px; display: flex; flex-direction: column; gap: 8px;
+            padding: 5px 10px; display: flex; flex-direction: column; gap: 5px;
             transition: all 0.2s;
         }
         .prep-row.moving-mode {
             border-color: #e74c3c; background: #fff0f0; box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
         }
         .prep-header { display: flex; justify-content: space-between; align-items: center; }
-        .prep-label { font-weight: bold; color: #d35400; font-size: 14px; }
-        .prep-actions { display: flex; gap: 5px; }
+        .prep-label { font-weight: bold; color: #d35400; font-size: 13px; }
+        .prep-actions { display: flex; gap: 3px; }
 
         /* Grid */
-        .courts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        .courts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 15px; }
 
-        /* Court */
+        /* Court Styles */
         .court {
-            background: #2ecc71; border: 4px solid white; border-radius: 4px; padding: 15px;
-            display: flex; flex-direction: column; gap: 10px; position: relative;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2); transition: box-shadow 0.3s;
+            background: var(--court-empty); /* Default Green */
+            border: 4px solid white; border-radius: 4px; padding: 10px;
+            display: flex; flex-direction: column; gap: 8px; position: relative;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.2); transition: box-shadow 0.3s;
         }
+        
+        /* Occupied State */
+        .court.occupied {
+            background: var(--court-busy); /* Deep Blue */
+            border-color: #ccc;
+        }
+
         .court.swapping { box-shadow: 0 0 15px 5px yellow; border-color: yellow; animation: pulse 1s infinite; }
         .court.target-mode { box-shadow: 0 0 15px 5px #e74c3c; border-color: #e74c3c; cursor: pointer; transform: scale(1.02); }
-        .court.coaching-mode { background: #95a5a6; border-color: #7f8c8d; }
+        .court.coaching-mode { background: var(--court-coach); border-color: #7f8c8d; }
 
         .coaching-overlay {
-            position: absolute; top: 50px; left: 0; width: 100%; height: calc(100% - 50px);
+            position: absolute; top: 45px; left: 0; width: 100%; height: calc(100% - 45px);
             background: rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center;
             color: white; font-size: 24px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            z-index: 5;
+            z-index: 5; pointer-events: none;
         }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
-        .court-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .court-title { color: white; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); font-size: 18px; margin-right: 10px;}
+        .court-header { 
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; 
+            position: relative; z-index: 10;
+        }
+        .court-title { color: white; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); font-size: 16px; margin-right: 10px;}
         .court-controls { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: space-between;}
-        .rule-select { padding: 2px; font-size: 12px; border-radius: 4px; border: none; width: 100px; }
         
-        .court-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+        .court-actions { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
 
         .btn-court-action {
-            border: 1px solid white; color: white; font-size: 11px; padding: 3px 8px;
+            border: 1px solid white; color: white; font-size: 11px; padding: 2px 6px;
             border-radius: 12px; cursor: pointer; white-space: nowrap;
         }
         .btn-clear { background: rgba(0,0,0,0.3); } .btn-clear:hover { background: #c0392b; }
@@ -177,20 +195,27 @@
         .btn-swap { background: #8e44ad; } .btn-swap:hover { background: #9b59b6; }
         .btn-move-in { background: #16a085; border:1px solid #16a085; } .btn-move-in:hover { background: #1abc9c; }
         .btn-coach { background: #2c3e50; } .btn-coach:hover { background: #34495e; }
-        .btn-coach.active { background: #c0392b; border-color: #c0392b; }
+        .btn-coach.active { background: #c0392b; border-color: #c0392b; font-weight: bold; }
 
-        .net { height: 4px; background: white; width: 100%; margin: 5px 0; opacity: 0.8; }
-        .team { display: flex; gap: 10px; justify-content: space-around; }
+        .net { height: 4px; background: white; width: 100%; margin: 4px 0; opacity: 0.8; }
+        .team { display: flex; gap: 8px; justify-content: space-around; }
 
         .slot {
-            background: rgba(255,255,255,0.9); border-radius: 6px; height: 55px; flex: 1;
+            background: rgba(255,255,255,0.9); border-radius: 6px; 
+            min-height: 60px; 
+            flex: 1;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             cursor: pointer; border: 2px dashed #ccc; position: relative;
         }
         .slot:hover { border-color: #666; }
         .slot-content { text-align: center; width: 100%; }
-        .slot-name { font-weight: bold; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
-        .slot-level { font-size: 11px; margin-top: 2px; }
+        .slot-name { 
+            font-weight: bold; 
+            font-size: 26px; /* 2x size */
+            line-height: 1.1;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; 
+        }
+        .slot-level { font-size: 10px; margin-top: 2px; }
 
         .remove-slot-btn {
             position: absolute; top: -5px; right: -5px; background: red; color: white;
@@ -202,11 +227,19 @@
 
         /* History */
         .history-list { list-style: none; padding: 0; margin: 0; }
-        .history-item { border-bottom: 1px solid #eee; padding: 8px 5px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #333; }
+        .history-item { 
+            border-bottom: 1px solid #eee; padding: 6px 4px; 
+            display: flex; flex-direction: column; gap: 3px;
+            font-size: 12px; color: #333; background: #fff;
+        }
         .history-item:nth-child(even) { background-color: #fafafa; }
-        .history-info { display: flex; align-items: center; gap: 5px; flex: 1; }
-        .match-badge { background: #7f8c8d; color: white; border-radius: 3px; padding: 1px 5px; font-size: 11px; }
-        .delete-hist-btn { color: #ccc; cursor: pointer; font-size: 16px; padding: 0 5px; }
+        
+        .history-header { display: flex; justify-content: space-between; align-items: center; }
+        .history-time { font-family: monospace; color: #666; background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+        .match-badge { background: #7f8c8d; color: white; border-radius: 3px; padding: 1px 5px; font-size: 10px; }
+        
+        .history-players { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; line-height: 1.3; }
+        .delete-hist-btn { color: #ccc; cursor: pointer; font-size: 14px; padding: 0 5px; }
         .delete-hist-btn:hover { color: red; }
 
         /* Tables & Modal */
@@ -215,12 +248,13 @@
         .stats-table th { background-color: #f2f2f2; }
         
         .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
-        .modal-content { background-color: white; padding: 20px; border-radius: 10px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background-color: white; padding: 20px; border-radius: 10px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; }
         .close-modal { float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
 
-        @media (max-width: 768px) {
-            .input-group { width: 100%; } .input-group input { flex: 1; }
-            .col-players, .col-history, .col-courts { min-width: 100%; }
+        @media (max-width: 1024px) {
+            .col-players { order: 1; flex: 100%; }
+            .col-courts { order: 2; flex: 100%; }
+            .col-history { order: 3; flex: 100%; }
         }
     </style>
 </head>
@@ -281,7 +315,23 @@
                 
                 <div class="section-header" style="margin-top:20px;">休息區 (暫停排點)</div>
                 <div id="restList" class="player-list"></div>
+
+                <div class="section-header" style="margin-top:20px; color:#95a5a6; border-color:#ccc;">未到區 (尚未抵達)</div>
+                <div id="absentList" class="player-list"></div>
             </div>
+        </div>
+
+        <div class="col-courts">
+            <div class="prep-controls-header">
+                <strong>備戰區</strong>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn-mini btn-add" title="增加備戰區" onclick="addPrepRow()">+ 增加</button>
+                    <button class="btn-mini btn-rest" title="減少備戰區" onclick="removePrepRow()">- 減少</button>
+                </div>
+            </div>
+            <div class="prep-container" id="prepContainer"></div>
+
+            <div id="courtsGrid" class="courts-grid"></div>
         </div>
 
         <div class="column-box col-history">
@@ -293,12 +343,6 @@
                  <ul id="historyListMain" class="history-list"></ul>
             </div>
         </div>
-
-        <div class="col-courts">
-            <div class="prep-container" id="prepContainer"></div>
-
-            <div id="courtsGrid" class="courts-grid"></div>
-        </div>
     </div>
 </div>
 
@@ -308,7 +352,7 @@
         <h2>統計表</h2>
         <button class="btn-export" onclick="exportCSV()">下載 CSV</button>
         <table class="stats-table">
-            <thead><tr><th>姓名</th><th>程度</th><th>場次</th><th>到場時間</th></tr></thead>
+            <thead><tr><th>姓名</th><th>程度</th><th>白搭王</th><th>場次</th><th>到場時間</th><th>目前休息</th><th>下場時間紀錄</th></tr></thead>
             <tbody id="statsBody"></tbody>
         </table>
     </div>
@@ -342,10 +386,9 @@
     // --- Data Model ---
     let players = [];
     let courts = []; 
-    let prepCourts = [[null,null,null,null], [null,null,null,null], [null,null,null,null]];
+    let prepCourts = [[null,null,null,null], [null,null,null,null]];
     let matchHistory = []; 
-    let courtRules = []; 
-    let courtCoaching = []; // [true, false...]
+    let courtCoaching = []; 
     
     let selectedPlayerId = null;
     let swapSourceIndex = null; 
@@ -363,7 +406,7 @@
         initLevelSelect();
         loadData();
         if(courts.length === 0) renderCourts();
-        if(prepCourts.length !== 3) prepCourts = [[null,null,null,null], [null,null,null,null], [null,null,null,null]];
+        if(!prepCourts || prepCourts.length === 0) prepCourts = [[null,null,null,null], [null,null,null,null]];
         
         renderAll();
         loadBgImage();
@@ -389,7 +432,7 @@
     }
 
     function speakCourt(i) {
-        if (courtCoaching[i]) return; // Silent if coaching
+        if (courtCoaching[i]) return;
         const names = courts[i].filter(x=>x).map(x=>x.name);
         if(names.length === 0) return alert("無人");
 
@@ -451,13 +494,15 @@
                 if (!name.includes("姓名") && !isNaN(level)) {
                     if (!players.some(p => p.name === name)) {
                         createPlayer(name, level, batchTime);
+                        // V20 修改：匯入名單預設為未到區 (isAbsent = true)
+                        players[players.length - 1].isAbsent = true;
                         added++;
                     }
                 }
             }
         });
         saveData(); renderPlayerList();
-        if(added>0) alert(`已匯入 ${added} 人 (到場時間: ${batchTime})`); else alert("匯入失敗，請檢查格式");
+        if(added>0) alert(`已匯入 ${added} 人 (全部預設至未到區)`); else alert("匯入失敗，請檢查格式");
     }
 
     function createPlayer(name, level, timeStr) {
@@ -465,9 +510,31 @@
             id: Date.now() + Math.random().toString(),
             name, level, count: 0, lastPlayedTime: 0,
             onCourt: false, isResting: false,
+            isAbsent: false, 
+            isUniversal: false, 
             partnerId: null, blacklist: [],
-            arrivalTime: timeStr || getCurrentTimeStr()
+            arrivalTime: timeStr || getCurrentTimeStr(),
+            currentStartTime: null,
+            matchEndTimes: []
         });
+    }
+
+    // --- Play Logic ---
+    function startPlay(p) {
+        p.onCourt = true;
+        p.currentStartTime = Date.now();
+    }
+
+    function resetPlayerState(p) {
+        p.onCourt = false;
+        p.currentStartTime = null;
+    }
+
+    function recordGameStats(p) {
+        p.count++;
+        p.lastPlayedTime = Date.now();
+        if (!p.matchEndTimes) p.matchEndTimes = [];
+        p.matchEndTimes.push(getCurrentTimeStr());
     }
 
     // --- Core Player Mgmt ---
@@ -492,7 +559,41 @@
     function toggleRest(id, evt) {
         evt.stopPropagation();
         const p = players.find(x=>x.id===id);
-        if(p) { p.isResting = !p.isResting; }
+        if(p) { 
+            const wasResting = p.isResting;
+            p.isResting = !p.isResting; 
+            // 如果從休息區移回候位區 (上場)，更新到場時間以重新排隊
+            if (wasResting && !p.isResting) {
+                p.arrivalTime = getCurrentTimeStr();
+            }
+        }
+        saveData(); renderPlayerList();
+    }
+
+    function toggleAbsent(id, evt) {
+        evt.stopPropagation();
+        const p = players.find(x=>x.id===id);
+        if(!p) return;
+
+        if (p.isAbsent) {
+            // Check In (報到)：從未到 -> 候位
+            p.isAbsent = false;
+            p.isResting = false;
+            p.arrivalTime = getCurrentTimeStr(); // 更新為當下時間
+        } else {
+            // Mark Absent (設為未到)
+            if(p.onCourt) return alert("場上球員不能設為未到");
+            p.isAbsent = true;
+            p.isResting = false;
+            prepCourts = prepCourts.map(r => r.map(x => (x && x.id===id)? null : x));
+        }
+        saveData(); renderAll();
+    }
+
+    function toggleUniversal(id, evt) {
+        evt.stopPropagation();
+        const p = players.find(x=>x.id===id);
+        if(p) { p.isUniversal = !p.isUniversal; }
         saveData(); renderPlayerList();
     }
 
@@ -541,15 +642,31 @@
     }
 
     // --- Prep Area Logic ---
+    function addPrepRow() {
+        prepCourts.push([null,null,null,null]);
+        saveData(); renderPrep(); renderPlayerList();
+    }
+
+    function removePrepRow() {
+        if(prepCourts.length === 0) return;
+        const lastRow = prepCourts[prepCourts.length-1];
+        if(lastRow.some(p=>p!==null)) {
+            if(!confirm("最後一排備戰區還有人，確定移除並退回候位區？")) return;
+        }
+        prepCourts.pop();
+        saveData(); renderPrep(); renderPlayerList();
+    }
+
     function clickPrepSlot(rowIdx, slotIdx) {
         if (selectedPlayerId) {
             const p = players.find(x=>x.id===selectedPlayerId);
             if(!p) return;
             if(p.onCourt) return alert("該球員已在場上");
+            if(p.isAbsent) return alert("未到球員不能排點");
             if(prepCourts.some(row => row.some(x => x && x.id === p.id))) return alert("已在備戰區");
             
             let current = prepCourts[rowIdx].filter(x=>x);
-            let val = checkGroupValidityWithReason([...current, p], 'B'); 
+            let val = checkGroupValidityWithReason([...current, p]); 
             if(!val.valid && !confirm(`規則警告: ${val.reason}，要排入嗎?`)) return;
 
             prepCourts[rowIdx][slotIdx] = p;
@@ -569,11 +686,12 @@
         if(emptyIndices.length === 0) return alert("此備戰列已滿");
         
         let current = prepCourts[rowIdx].filter(x=>x);
-        let pool = getSortedWaitingList().filter(p => !prepCourts.some(r => r.includes(p)));
-        
-        if(current.length > 0) pool = pool.filter(p => isGroupValid([...current, p], 'B'));
+        let pool = getSortedWaitingList();
+        pool = pool.filter(p => !prepCourts.some(r => r.includes(p)));
 
-        const match = findPartialMatch(pool, emptyIndices.length, current, 'B');
+        if(current.length > 0) pool = pool.filter(p => isGroupValid([...current, p]));
+
+        const match = findBestGroupWithScore(pool, emptyIndices.length, current);
         if(match.length === emptyIndices.length) {
             match.forEach((p, i) => prepCourts[rowIdx][emptyIndices[i]] = p);
             saveData(); renderAll();
@@ -598,11 +716,12 @@
             if(!confirm("該場地已有球員，確定要覆蓋嗎？")) {
                 movingPrepIndex = null; renderAll(); return;
             }
-            courts[courtIdx].forEach(p => { if(p) { p.onCourt = false; } });
+            courts[courtIdx].forEach(p => { if(p) { resetPlayerState(p); } });
         }
 
-        courts[courtIdx] = [...prepCourts[movingPrepIndex]];
-        courts[courtIdx].forEach(p => { if(p) { p.onCourt = true; p.count++; } });
+        const newPlayers = [...prepCourts[movingPrepIndex]];
+        courts[courtIdx] = newPlayers;
+        newPlayers.forEach(p => { if(p) startPlay(p); });
         
         prepCourts[movingPrepIndex] = [null,null,null,null];
         movingPrepIndex = null;
@@ -610,17 +729,13 @@
     }
 
     // --- Main Court Interaction ---
-    function updateCourtRule(courtIdx, val) {
-        courtRules[courtIdx] = val;
-        saveData();
-    }
-
     function toggleCoaching(courtIdx) {
-        if(courts[courtIdx].some(p=>p!==null)) {
-            if(!confirm("切換為教練課將清空目前場上人員並退回候位區，確定嗎？")) return;
-            // Clear but keep stats, reset onCourt
-            courts[courtIdx].forEach(p => { if(p) p.onCourt = false; });
-            courts[courtIdx] = [null,null,null,null];
+        if (!courtCoaching[courtIdx]) { // Turning ON
+            if(courts[courtIdx].some(p=>p!==null)) {
+                if(!confirm("切換為教練課將清空目前場上人員並退回候位區，確定嗎？")) return;
+                courts[courtIdx].forEach(p => { if(p) resetPlayerState(p); });
+                courts[courtIdx] = [null,null,null,null];
+            }
         }
         courtCoaching[courtIdx] = !courtCoaching[courtIdx];
         saveData();
@@ -628,7 +743,7 @@
     }
 
     function clickSlot(courtIdx, slotIdx) {
-        if(courtCoaching[courtIdx]) return; // Block
+        if(courtCoaching[courtIdx]) return;
         if (movingPrepIndex !== null) { movePrepToCourtEnd(courtIdx); return; }
         if (swapSourceIndex !== null) { initiateSwap(courtIdx); return; }
 
@@ -636,27 +751,27 @@
             const p = players.find(x=>x.id===selectedPlayerId);
             if(!p) return;
             if(p.onCourt) return alert("已在場上");
+            if(p.isAbsent) return alert("未到球員不能排點");
             if(prepCourts.some(r => r.some(x => x && x.id === p.id))) return alert("已在備戰區");
 
             const court = courts[courtIdx];
             const current = court.filter(x=>x);
-            const rule = courtRules[courtIdx] || 'B';
-            const val = checkGroupValidityWithReason([...current, p], rule);
+            const val = checkGroupValidityWithReason([...current, p]);
             
             if(!val.valid && !confirm(`規則警告: ${val.reason}，要排入嗎?`)) return;
 
             court[slotIdx] = p;
-            p.onCourt = true; p.count++;
+            startPlay(p);
 
             if(p.partnerId) {
                 const partner = players.find(x=>x.id===p.partnerId);
-                if(partner && !partner.onCourt) {
+                if(partner && !partner.onCourt && !partner.isAbsent) {
                     const pIdx = (slotIdx%2===0)?slotIdx+1:slotIdx-1;
                     if(court[pIdx]===null) {
                         const current2 = court.filter(x=>x); 
-                        if(checkGroupValidityWithReason([...current2, partner], rule).valid || confirm(`搭檔 ${partner.name} 有衝突，要強制加入嗎?`)) {
+                        if(checkGroupValidityWithReason([...current2, partner]).valid || confirm(`搭檔 ${partner.name} 有衝突，要強制加入嗎?`)) {
                             court[pIdx] = partner;
-                            partner.onCourt = true; partner.count++;
+                            startPlay(partner);
                         }
                     }
                 }
@@ -669,39 +784,41 @@
         evt.stopPropagation();
         const p = courts[courtIdx][slotIdx];
         if(p) {
-            p.onCourt = false; p.count--; if(p.count<0) p.count=0;
+            resetPlayerState(p); 
             courts[courtIdx][slotIdx] = null;
             saveData(); renderAll();
         }
     }
 
     // --- Logic ---
-    function checkGroupValidityWithReason(group, ruleCode) {
-        const levels = group.map(p=>p.level);
+    function checkGroupValidityWithReason(group) {
         for(let i=0; i<group.length; i++) {
             for(let j=i+1; j<group.length; j++) {
                 if(group[i].blacklist && group[i].blacklist.includes(group[j].id))
                     return {valid:false, reason:`迴避設定 (${group[i].name} X ${group[j].name})`};
             }
         }
-        if (ruleCode === 'C') return {valid:true}; 
-        if (ruleCode === 'B') { 
-            const hasLow = levels.some(l => l>=3 && l<=6);
-            const hasHigh = levels.some(l => l>=8);
-            if(hasLow && hasHigh) return {valid:false, reason:"等級分組限制"};
-        }
-        if (ruleCode === 'A') { 
-            if (group.length === 4) {
-                const t1 = group[0].level + group[1].level;
-                const t2 = group[2].level + group[3].level;
-                if (Math.abs(t1 - t2) > 4) return {valid:false, reason:`實力差距過大 (${Math.abs(t1-t2)})`};
+
+        const hasUniversal = group.some(p => p.isUniversal);
+        if (hasUniversal) return {valid:true};
+
+        if(group.length > 1) {
+            const levels = group.map(p=>p.level);
+            const max = Math.max(...levels);
+            const min = Math.min(...levels);
+            
+            if(max - min > 4) {
+                const hasPartners = group.some(p => p.partnerId && group.some(g => g.id === p.partnerId));
+                if (!hasPartners) {
+                    return {valid:false, reason:`等級差距過大 (${max}-${min} > 4)`};
+                }
             }
         }
         return {valid:true};
     }
 
-    function isGroupValid(group, rule) { return checkGroupValidityWithReason(group, rule).valid; }
-
+    function isGroupValid(group) { return checkGroupValidityWithReason(group).valid; }
+    
     function autoAssignAll() {
         const n = parseInt(document.getElementById('courtCount').value);
         for(let i=0; i<n; i++) autoAssignSingleLogic(i, false);
@@ -719,17 +836,32 @@
         const empties = court.map((p,i)=>p===null?i:-1).filter(i=>i!==-1);
         if(empties.length===0) { if(alertOnFail) alert("場地已滿"); return false; }
 
+        // --- V18 新增：備戰區優先邏輯 ---
+        if (empties.length === 4) {
+            // Find full prep row
+            const fullPrepIndex = prepCourts.findIndex(row => row.every(p => p !== null));
+            if (fullPrepIndex !== -1) {
+                const prepRow = prepCourts[fullPrepIndex];
+                prepRow.forEach((p, i) => {
+                    court[i] = p;
+                    startPlay(p);
+                });
+                prepCourts[fullPrepIndex] = [null, null, null, null];
+                return true; 
+            }
+        }
+        // -----------------------------
+
         const current = court.filter(x=>x);
-        let pool = getSortedWaitingList();
-        const rule = courtRules[courtIdx] || 'B';
+        let pool = getSortedWaitingList(); 
 
-        if (current.length > 0) pool = pool.filter(p => isGroupValid([...current, p], rule));
+        if (current.length > 0) pool = pool.filter(p => isGroupValid([...current, p]));
 
-        const match = findPartialMatch(pool, empties.length, current, rule);
+        const match = findBestGroupWithScore(pool, empties.length, current);
         if(match.length === empties.length) {
             match.forEach((p, i) => {
                 court[empties[i]] = p;
-                p.onCourt = true; p.count++;
+                startPlay(p);
             });
             return true;
         } else {
@@ -738,38 +870,112 @@
         }
     }
 
-    function findPartialMatch(pool, needed, existing, rule) {
-        let result = [];
-        let used = new Set();
-        const check = (cands) => isGroupValid([...existing, ...result, ...cands], rule);
+    function findBestGroupWithScore(fullPool, needed, existing) {
+        if (fullPool.length < needed) return [];
 
-        for(let i=0; i<pool.length; i++) {
-            if(result.length === needed) break;
-            let p1 = pool[i];
-            if(used.has(p1.id)) continue;
+        const seedLimit = Math.min(fullPool.length, 12); 
 
-            if(p1.partnerId) {
-                if(needed - result.length >= 2) {
-                    let p2 = pool.find(x=>x.id===p1.partnerId);
-                    if(p2 && !used.has(p2.id)) {
-                        if(check([p1, p2])) {
-                            result.push(p1, p2); used.add(p1.id); used.add(p2.id);
+        let bestGroup = [];
+        let lowestScore = Infinity;
+
+        for (let i = 0; i < seedLimit; i++) {
+            let p1 = fullPool[i];
+            let potentialGroup = [p1];
+            let usedIds = new Set([p1.id]);
+            
+            if (p1.partnerId) {
+                let partner = fullPool.find(x => x.id === p1.partnerId);
+                if (partner && !usedIds.has(partner.id)) {
+                    let testGroup = [...existing, p1, partner];
+                    if (isGroupValid(testGroup)) {
+                        if(needed >= 2) {
+                            potentialGroup.push(partner);
+                            usedIds.add(partner.id);
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        continue; 
+                    }
+                } else if (!partner && players.find(x => x.id === p1.partnerId && (x.onCourt || x.isAbsent))) {
+                     continue; 
+                }
+            } else {
+                if (!isGroupValid([...existing, p1])) continue;
+            }
+
+            if (potentialGroup.length < needed) {
+                for (let k = 0; k < fullPool.length; k++) {
+                    if (potentialGroup.length === needed) break;
+                    let cand = fullPool[k];
+                    if (usedIds.has(cand.id)) continue;
+
+                    if (cand.partnerId) {
+                        if (needed - potentialGroup.length < 2) continue;
+                        let cPartner = fullPool.find(x => x.id === cand.partnerId);
+                        if (cPartner && !usedIds.has(cPartner.id)) {
+                            let testG = [...existing, ...potentialGroup, cand, cPartner];
+                            if (isGroupValid(testG)) {
+                                potentialGroup.push(cand, cPartner);
+                                usedIds.add(cand.id); usedIds.add(cPartner.id);
+                            }
+                        }
+                    } else {
+                        if (isGroupValid([...existing, ...potentialGroup, cand])) {
+                            potentialGroup.push(cand);
+                            usedIds.add(cand.id);
                         }
                     }
                 }
-            } else {
-                if(check([p1])) { result.push(p1); used.add(p1.id); }
+            }
+
+            if (potentialGroup.length === needed) {
+                let score = calculateGroupScore([...existing, ...potentialGroup]);
+                if (score < lowestScore) {
+                    lowestScore = score;
+                    bestGroup = potentialGroup;
+                }
+                if (score === 0) break;
             }
         }
-        if(result.length === needed && (result.length + existing.length === 4) && rule === 'A') {
-             if(!isGroupValid([...existing, ...result], rule)) return [];
+        return bestGroup;
+    }
+
+    function calculateGroupScore(group) {
+        let score = 0;
+        for (let i = 0; i < group.length; i++) {
+            for (let j = i + 1; j < group.length; j++) {
+                if (hasPaired(group[i], group[j])) score += 5000;
+                if (hasPlayedInSameMatch(group[i], group[j])) score += 100;
+            }
         }
-        return result.length === needed ? result : [];
+        const totalCounts = group.reduce((sum, p) => sum + p.count, 0);
+        score += totalCounts * 10; 
+        return score;
+    }
+
+    function hasPaired(p1, p2) {
+        for (let m of matchHistory) {
+            const ids = m.playerIds;
+            if (ids.length < 4) continue;
+            const p1InT1 = (ids[0]===p1.id || ids[1]===p1.id);
+            const p2InT1 = (ids[0]===p2.id || ids[1]===p2.id);
+            const p1InT2 = (ids[2]===p1.id || ids[3]===p1.id);
+            const p2InT2 = (ids[2]===p2.id || ids[3]===p2.id);
+            if ((p1InT1 && p2InT1) || (p1InT2 && p2InT2)) return true;
+        }
+        return false;
+    }
+
+    function hasPlayedInSameMatch(p1, p2) {
+        for (let m of matchHistory) {
+            if (m.playerIds.includes(p1.id) && m.playerIds.includes(p2.id)) return true;
+        }
+        return false;
     }
 
     function getSortedWaitingList() {
-        return players.filter(p => !p.onCourt && !p.isResting && !prepCourts.some(r=>r.includes(p))).sort((a,b) => {
-            if(a.count !== b.count) return a.count - b.count;
+        return players.filter(p => !p.onCourt && !p.isResting && !p.isAbsent && !prepCourts.some(r=>r.includes(p))).sort((a,b) => {
             return (a.lastPlayedTime||0) - (b.lastPlayedTime||0);
         });
     }
@@ -779,44 +985,44 @@
         const n = parseInt(document.getElementById('courtCount').value);
         const grid = document.getElementById('courtsGrid');
         
-        while(courts.length < n) { courts.push([null,null,null,null]); courtRules.push('B'); courtCoaching.push(false); }
-        if(courts.length > n) { courts.length = n; courtRules.length = n; courtCoaching.length = n; }
-        for(let k=0; k<n; k++) { if(!courtRules[k]) courtRules[k] = 'B'; if(courtCoaching[k]===undefined) courtCoaching[k]=false; }
+        while(courts.length < n) { courts.push([null,null,null,null]); courtCoaching.push(false); }
+        if(courts.length > n) { courts.length = n; courtCoaching.length = n; }
+        for(let k=0; k<n; k++) { if(courtCoaching[k]===undefined) courtCoaching[k]=false; }
 
         let html = '';
         courts.forEach((court, i) => {
             const isTarget = (movingPrepIndex !== null);
             const isSwapping = (swapSourceIndex === i);
             const isCoach = courtCoaching[i];
-            const r = courtRules[i];
+            const isOccupied = court.some(p => p !== null); 
+            const coachBtnText = isCoach ? "❌ 解除" : "👨‍🏫 教練";
             
             const slots = court.map((p, si) => {
                 if(!p) return `<div class="slot" onclick="clickSlot(${i},${si})"><span style="color:#ccc;font-size:20px;">+</span></div>`;
                 const cls = (p.level<=6)?'lvl-low':(p.level>=11?'lvl-high':'lvl-mid');
+                const uStar = p.isUniversal ? '🌟' : '';
                 return `
                 <div class="slot filled" onclick="clickSlot(${i},${si})">
                     <div class="remove-slot-btn" onclick="removeSlot(${i},${si},event)">×</div>
                     <div class="slot-content">
-                        <div class="slot-name">${p.name}</div>
+                        <div class="slot-name">
+                            ${uStar}${p.name}
+                            <span style="font-size:16px; color:#555; font-weight:normal;">(${p.count})</span>
+                        </div>
                         <div class="slot-level tag ${cls}">${p.level}</div>
                     </div>
                 </div>`;
             });
 
-            // Coaching Overlay
             const overlay = isCoach ? `<div class="coaching-overlay">🏸 教練指導中 🏸</div>` : '';
+            const courtClass = `court ${isOccupied ? 'occupied' : ''} ${isTarget ? 'target-mode' : ''} ${isSwapping ? 'swapping' : ''} ${isCoach ? 'coaching-mode' : ''}`;
 
             html += `
-            <div class="court ${isTarget?'target-mode':''} ${isSwapping?'swapping':''} ${isCoach?'coaching-mode':''}" ${isTarget?`onclick="movePrepToCourtEnd(${i})"`:''}>
+            <div class="${courtClass}" ${isTarget?`onclick="movePrepToCourtEnd(${i})"`:''}>
                 ${overlay}
                 <div class="court-header">
                     <div class="court-controls">
                         <div class="court-title">場地 ${i+1}</div>
-                        <select class="rule-select" onchange="updateCourtRule(${i}, this.value)" onclick="event.stopPropagation()" ${isCoach?'disabled':''}>
-                            <option value="B" ${r==='B'?'selected':''}>B:分級</option>
-                            <option value="A" ${r==='A'?'selected':''}>A:均衡</option>
-                            <option value="C" ${r==='C'?'selected':''}>C:亂鬥</option>
-                        </select>
                     </div>
                 </div>
                 <div class="court-actions" style="margin-bottom:8px;">
@@ -824,7 +1030,7 @@
                     <button class="btn-court-action btn-swap" onclick="event.stopPropagation(); initiateSwap(${i})">⇄ 交換</button>
                     <button class="btn-court-action btn-auto-court" onclick="event.stopPropagation(); autoAssignSingle(${i})">🎲 自動</button>
                     <button class="btn-court-action btn-speak" onclick="event.stopPropagation(); speakCourt(${i})">📣 叫名</button>
-                    <button class="btn-court-action btn-coach ${isCoach?'active':''}" onclick="event.stopPropagation(); toggleCoaching(${i})">👨‍🏫 教練</button>
+                    <button class="btn-court-action btn-coach ${isCoach?'active':''}" onclick="event.stopPropagation(); toggleCoaching(${i})">${coachBtnText}</button>
                     <button class="btn-court-action btn-clear" onclick="event.stopPropagation(); clearCourt(${i})">🏁 結束</button>
                     ` : '<div style="width:100%;text-align:center;color:red;font-weight:bold;padding:5px;">👇 點擊此處移入</div>'}
                 </div>
@@ -845,9 +1051,16 @@
             const slots = row.map((p, i) => {
                 if(!p) return `<div class="slot" onclick="clickPrepSlot(${rIdx},${i})"><span style="color:#ccc;">+</span></div>`;
                 const cls = (p.level<=6)?'lvl-low':(p.level>=11?'lvl-high':'lvl-mid');
+                const uStar = p.isUniversal ? '🌟' : '';
                 return `<div class="slot filled" onclick="clickPrepSlot(${rIdx},${i})">
                     <div class="remove-slot-btn" onclick="removePrepSlot(${rIdx},${i},event)">×</div>
-                    <div class="slot-content"><div class="slot-name">${p.name}</div><div class="slot-level tag ${cls}">${p.level}</div></div>
+                    <div class="slot-content">
+                        <div class="slot-name" style="font-size:16px;">
+                            ${uStar}${p.name}
+                            <span style="font-size:12px; color:#555;">(${p.count})</span>
+                        </div>
+                        <div class="slot-level tag ${cls}">${p.level}</div>
+                    </div>
                 </div>`;
             }).join('');
 
@@ -870,26 +1083,43 @@
     function renderPlayerList() {
         const waitList = document.getElementById('playerList');
         const restList = document.getElementById('restList');
-        waitList.innerHTML = ''; restList.innerHTML = '';
+        const absentList = document.getElementById('absentList');
         
-        const waiting = players.filter(p => !p.onCourt && !p.isResting && !prepCourts.some(r=>r.includes(p)));
+        waitList.innerHTML = ''; restList.innerHTML = ''; absentList.innerHTML = '';
+        
+        const waiting = players.filter(p => !p.onCourt && !p.isResting && !p.isAbsent && !prepCourts.some(r=>r.includes(p)));
         document.getElementById('waitCount').innerText = waiting.length;
 
-        waiting.sort((a,b) => (a.count - b.count) || (a.lastPlayedTime - b.lastPlayedTime));
+        // Visual Sort
+        const displaySorted = [...waiting].sort((a,b) => (a.count - b.count) || (a.lastPlayedTime - b.lastPlayedTime));
 
-        const createCard = (p, isRest) => {
+        const createCard = (p, type) => {
             const cls = (p.level<=6)?'lvl-low':(p.level>=11?'lvl-high':'lvl-mid');
             const partner = p.partnerId ? '❤️' : '';
             const bl = p.blacklist.length ? '🚫' : '';
             const sel = selectedPlayerId===p.id ? 'selected' : '';
-            const actionBtn = isRest 
-                ? `<button class="btn-mini btn-active" onclick="toggleRest('${p.id}',event)">⬆️</button>`
-                : `<button class="btn-mini btn-rest" onclick="toggleRest('${p.id}',event)">💤</button>`;
+            
+            let actionBtn = '';
+            let universalBtn = `<button class="btn-mini ${p.isUniversal ? 'btn-universal' : 'btn-universal-off'}" onclick="toggleUniversal('${p.id}', event)" title="設定為白搭王">${p.isUniversal ? '🌟' : '🃏'}</button>`;
+            let absentBtn = '';
+
+            if (type === 'absent') {
+                actionBtn = `<button class="btn-mini btn-arrive" onclick="toggleAbsent('${p.id}',event)" title="報到">✅</button>`;
+                universalBtn = ''; 
+            } else {
+                const restIcon = (type === 'rest') ? '⬆️' : '💤';
+                const restClass = (type === 'rest') ? 'btn-active' : 'btn-rest';
+                actionBtn = `<button class="btn-mini ${restClass}" onclick="toggleRest('${p.id}',event)">${restIcon}</button>`;
+                absentBtn = `<button class="btn-mini btn-absent" onclick="toggleAbsent('${p.id}',event)" title="設為未到/外出">🚪</button>`;
+            }
             
             const timeStr = p.arrivalTime ? `🕒${p.arrivalTime}` : '';
+            const uClass = p.isUniversal ? 'universal-player' : '';
+            const absentClass = (type === 'absent') ? 'absent' : '';
+            const restClassCard = (type === 'rest') ? 'resting' : '';
 
             return `
-            <div class="player-card ${sel} ${isRest?'resting':''}" onclick="selectPlayer('${p.id}')">
+            <div class="player-card ${sel} ${restClassCard} ${absentClass} ${uClass}" onclick="selectPlayer('${p.id}')">
                 <div style="display:flex;align-items:center;">
                     <span class="tag ${cls}" ondblclick="event.stopPropagation(); editLevel('${p.id}')" title="雙擊修改程度">${p.level}</span>
                     <span class="name-edit" ondblclick="event.stopPropagation(); renamePlayer('${p.id}')" title="雙擊修改名字">${partner}${bl}${p.name}</span>
@@ -897,14 +1127,17 @@
                 <div style="display:flex;align-items:center;">
                     <span class="time-badge">${timeStr}</span>
                     <span class="count-badge">${p.count}</span>
+                    ${universalBtn}
                     ${actionBtn}
+                    ${absentBtn}
                     <span class="delete-btn" onclick="removePlayer('${p.id}',event)">×</span>
                 </div>
             </div>`;
         };
 
-        waiting.forEach(p => waitList.innerHTML += createCard(p, false));
-        players.filter(p => p.isResting).forEach(p => restList.innerHTML += createCard(p, true));
+        displaySorted.forEach(p => waitList.innerHTML += createCard(p, 'wait'));
+        players.filter(p => p.isResting && !p.isAbsent).forEach(p => restList.innerHTML += createCard(p, 'rest'));
+        players.filter(p => p.isAbsent).forEach(p => absentList.innerHTML += createCard(p, 'absent'));
     }
 
     function selectPlayer(id) { selectedPlayerId = (selectedPlayerId===id)?null:id; renderPlayerList(); renderPrep(); renderCourts(); }
@@ -914,14 +1147,16 @@
         matchHistory.forEach((m, idx) => {
             const names = m.detail.map(d=>`${d.name}(${d.level})`).join('+');
             const num = matchHistory.length - idx;
+            const timeInfo = m.startTimeStr ? `${m.startTimeStr}~${m.endTimeStr} (${m.durationStr})` : m.time;
+
             ul.innerHTML += `
             <li class="history-item">
-                <div class="history-info">
+                <div class="history-header">
                     <span class="match-badge">#${num}</span>
-                    <span style="font-size:11px;color:#888;">${m.time}</span>
-                    <span>${names}</span>
+                    <span class="history-time">${timeInfo}</span>
+                    <span class="delete-hist-btn" onclick="deleteHistoryItem(${idx})">×</span>
                 </div>
-                <span class="delete-hist-btn" onclick="deleteHistoryItem(${idx})">×</span>
+                <div class="history-players">${names}</div>
             </li>`;
         });
     }
@@ -934,14 +1169,40 @@
         if(courtCoaching[i]) return;
         const c = courts[i]; if(!c.some(x=>x)) return;
         if(!confirm("結束並清空?")) return;
+        
         const pIds = c.filter(x=>x).map(x=>x.id);
         const pDet = c.filter(x=>x).map(x=>({name:x.name, level:x.level}));
+        const endTime = Date.now();
+        
+        let startTime = endTime;
+        c.forEach(p => {
+            if(p && p.currentStartTime && p.currentStartTime < startTime) startTime = p.currentStartTime;
+        });
+        
+        const formatTime = (ts) => new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        const durationMins = Math.round((endTime - startTime) / 60000);
+        
         if(pIds.length>0) {
-            matchHistory.unshift({id:Date.now(), time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), playerIds:pIds, detail:pDet});
+            matchHistory.unshift({
+                id: Date.now(), 
+                time: formatTime(endTime), 
+                startTimeStr: formatTime(startTime),
+                endTimeStr: formatTime(endTime),
+                durationStr: durationMins + "分",
+                playerIds: pIds, 
+                detail: pDet
+            });
             if(matchHistory.length>200) matchHistory.pop();
         }
-        const now = Date.now();
-        courts[i].forEach((p, idx) => { if(p){ p.onCourt=false; p.lastPlayedTime=now; courts[i][idx]=null; }});
+        
+        // V16: Only record counts here
+        courts[i].forEach((p, idx) => { 
+            if(p){ 
+                recordGameStats(p); 
+                resetPlayerState(p); 
+                courts[i][idx]=null; 
+            }
+        });
         saveData(); renderAll();
     }
 
@@ -952,24 +1213,28 @@
             courts: courts.map(c=>c.map(p=>p?p.id:null)),
             prepCourts: prepCourts.map(r=>r.map(p=>p?p.id:null)), 
             nCourts: document.getElementById('courtCount').value,
-            courtRules, courtCoaching,
+            courtCoaching,
             voice: document.getElementById('voiceSelect').value
         };
-        localStorage.setItem('badAppV6', JSON.stringify(d));
+        localStorage.setItem('badAppV20', JSON.stringify(d)); // Version Bump to V20
     }
     function loadData() {
-        const d = JSON.parse(localStorage.getItem('badAppV6'));
+        const d = JSON.parse(localStorage.getItem('badAppV20'));
         if(d) {
             players = (d.players||[]).map(p => ({
                 ...p, 
                 isResting: p.isResting||false, 
+                isAbsent: p.isAbsent || false, 
+                isUniversal: p.isUniversal || false, 
                 blacklist: p.blacklist||[], 
                 partnerId: p.partnerId||null,
-                arrivalTime: p.arrivalTime || '' 
+                arrivalTime: p.arrivalTime || '',
+                totalPlayTime: p.totalPlayTime || 0,
+                currentStartTime: p.currentStartTime || null,
+                matchEndTimes: p.matchEndTimes || [] 
             }));
             matchHistory = d.matchHistory || [];
             document.getElementById('courtCount').value = d.nCourts || 4;
-            courtRules = d.courtRules || [];
             courtCoaching = d.courtCoaching || [];
             if(d.voice) document.getElementById('voiceSelect').value = d.voice;
             
@@ -983,17 +1248,37 @@
     
     function clearAllData() {
         if(confirm("清除所有資料?")) {
-            localStorage.removeItem('badAppV6'); localStorage.removeItem('badBg');
+            localStorage.removeItem('badAppV20'); localStorage.removeItem('badBg');
             location.reload();
         }
     }
     function clearHistory() { if(confirm("清空紀錄?")) { matchHistory=[]; saveData(); renderHistory(); }}
-    function resetAllCourts() { if(confirm("清空場地?")) { courts.forEach(c=>c.forEach(p=>{if(p){p.onCourt=false; p.lastPlayedTime=Date.now();}})); courts=courts.map(c=>[null,null,null,null]); saveData(); renderAll(); }}
+    function resetAllCourts() { if(confirm("清空場地?")) { courts.forEach(c=>c.forEach(p=>{if(p){resetPlayerState(p);}})); courts=courts.map(c=>[null,null,null,null]); saveData(); renderAll(); }}
+    
     function showStats() {
         const b = document.getElementById('statsBody'); b.innerHTML='';
+        const now = Date.now();
         [...players].sort((a,b)=>b.count-a.count).forEach(p=>{
             const t = p.arrivalTime || '-';
-            b.innerHTML+=`<tr><td>${p.name}</td><td>${p.level}</td><td>${p.count}</td><td>${t}</td></tr>`;
+            let restTimeStr = '-';
+            if (!p.onCourt && p.lastPlayedTime > 0) {
+                const mins = Math.round((now - p.lastPlayedTime) / 60000);
+                restTimeStr = mins + " 分";
+            } else if (p.onCourt) {
+                restTimeStr = "比賽中";
+            }
+            const historyStr = (p.matchEndTimes || []).join('; ');
+            const uStr = p.isUniversal ? '是' : '';
+
+            b.innerHTML+=`<tr>
+                <td>${p.name}</td>
+                <td>${p.level}</td>
+                <td>${uStr}</td>
+                <td>${p.count}</td>
+                <td>${t}</td>
+                <td>${restTimeStr}</td>
+                <td style="font-size:12px; color:#666;">${historyStr}</td>
+            </tr>`;
         });
         document.getElementById('statsModal').style.display='flex';
     }
@@ -1008,7 +1293,7 @@
     }
     function loadBgImage() { const d = localStorage.getItem('badBg'); if(d) document.getElementById('bgLayer').style.backgroundImage=`url('${d}')`; }
 
-    // ... (Partner/Blacklist Modals same) ...
+    // ... (Partner/Blacklist Modals) ...
     function showPartnerModal() {
         const s1 = document.getElementById('partnerP1'), s2 = document.getElementById('partnerP2');
         s1.innerHTML = '<option value="">選人...</option>'; s2.innerHTML = '<option value="">選人...</option>';
@@ -1080,7 +1365,17 @@
     }
     function exportCSV() {
         const link = document.createElement("a");
-        link.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURI("姓名,程度,上場次數,到場時間\n" + players.map(p=>`${p.name},${p.level},${p.count},${p.arrivalTime||''}`).join('\n'));
+        const now = Date.now();
+        const csvContent = "姓名,程度,白搭王,上場次數,到場時間,目前休息(分),下場時間紀錄\n" + 
+            players.map(p => {
+                let rest = '-';
+                if (!p.onCourt && p.lastPlayedTime > 0) rest = Math.round((now - p.lastPlayedTime) / 60000);
+                const history = (p.matchEndTimes || []).join('; ');
+                const uStr = p.isUniversal ? '是' : '';
+                return `${p.name},${p.level},${uStr},${p.count},${p.arrivalTime||''},${rest},${history}`;
+            }).join('\n');
+        
+        link.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURI(csvContent);
         link.download = `統計.csv`; link.click();
     }
 </script>
